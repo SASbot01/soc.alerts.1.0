@@ -72,7 +72,7 @@ const IncidentDetail: React.FC = () => {
             </button>
 
             {/* Header */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6">
                 <div className="flex items-start justify-between mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-white mb-2">{incident.title}</h1>
@@ -95,7 +95,7 @@ const IncidentDetail: React.FC = () => {
                 <div className="flex gap-4 items-end pt-4 border-t border-slate-700/50">
                     <div>
                         <label className="text-xs text-slate-400">Status</label>
-                        <select value={status} onChange={e => setStatus(e.target.value)} className="block mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm">
+                        <select value={status} onChange={e => setStatus(e.target.value)} className="block mt-1 bg-slate-900 border border-slate-700 rounded-[2px] px-3 py-1.5 text-white text-sm">
                             {['open', 'investigating', 'contained', 'resolved', 'closed'].map(s => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
@@ -103,21 +103,21 @@ const IncidentDetail: React.FC = () => {
                     </div>
                     <div>
                         <label className="text-xs text-slate-400">Assigned To</label>
-                        <input value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="block mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm" />
+                        <input value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className="block mt-1 bg-slate-900 border border-slate-700 rounded-[2px] px-3 py-1.5 text-white text-sm" />
                     </div>
-                    <button onClick={handleUpdate} className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm transition-colors">Update</button>
+                    <button onClick={handleUpdate} className="px-4 py-1.5 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm transition-colors">Update</button>
                 </div>
             </div>
 
             {/* Timeline */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6">
                 <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><MessageSquare className="w-5 h-5" /> Timeline</h2>
 
                 {/* Add Entry */}
                 <form onSubmit={handleAddTimeline} className="flex gap-3 mb-6">
-                    <input value={timelineForm.action} onChange={e => setTimelineForm({ ...timelineForm, action: e.target.value })} placeholder="Action (e.g., Note, Escalation)" className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm flex-shrink-0 w-44" />
-                    <input value={timelineForm.description} onChange={e => setTimelineForm({ ...timelineForm, description: e.target.value })} placeholder="Description..." className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm flex-1" />
-                    <button type="submit" className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"><Send className="w-4 h-4" /></button>
+                    <input value={timelineForm.action} onChange={e => setTimelineForm({ ...timelineForm, action: e.target.value })} placeholder="Action (e.g., Note, Escalation)" className="bg-slate-900 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm flex-shrink-0 w-44" />
+                    <input value={timelineForm.description} onChange={e => setTimelineForm({ ...timelineForm, description: e.target.value })} placeholder="Description..." className="bg-slate-900 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm flex-1" />
+                    <button type="submit" className="p-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors"><Send className="w-4 h-4" /></button>
                 </form>
 
                 {/* Entries */}

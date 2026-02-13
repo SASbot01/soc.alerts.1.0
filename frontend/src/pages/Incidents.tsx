@@ -73,7 +73,7 @@ const Incidents: React.FC = () => {
                     <h1 className="text-2xl font-bold text-white mb-1">Incidents</h1>
                     <p className="text-slate-400">Security incident management and response tracking</p>
                 </div>
-                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition-colors">
+                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors">
                     <Plus className="w-4 h-4" /> New Incident
                 </button>
             </div>
@@ -86,7 +86,7 @@ const Incidents: React.FC = () => {
                     { label: 'Critical', value: criticalCount, color: 'text-orange-400' },
                     { label: 'SLA Breached', value: breachedCount, color: 'text-red-500' },
                 ].map((s, i) => (
-                    <div key={i} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+                    <div key={i} className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-4">
                         <div className={clsx("text-2xl font-bold", s.color)}>{s.value}</div>
                         <div className="text-sm text-slate-400">{s.label}</div>
                     </div>
@@ -97,14 +97,14 @@ const Incidents: React.FC = () => {
             <div className="flex gap-2">
                 {['all', 'open', 'investigating', 'contained', 'resolved', 'closed'].map(f => (
                     <button key={f} onClick={() => setFilter(f)} className={clsx(
-                        "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize",
+                        "px-3 py-1.5 rounded-[2px] text-sm font-medium transition-colors capitalize",
                         filter === f ? "bg-primary-500/20 text-primary-400 border border-primary-500/30" : "text-slate-400 hover:bg-slate-800"
                     )}>{f}</button>
                 ))}
             </div>
 
             {/* Table */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-slate-700/50">
@@ -152,21 +152,21 @@ const Incidents: React.FC = () => {
             {/* Create Modal */}
             {showCreate && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowCreate(false)}>
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                    <div className="bg-slate-900 border border-slate-700 rounded-[2px] p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
                         <h2 className="text-xl font-bold text-white mb-4">Create Incident</h2>
                         <form onSubmit={handleCreate} className="space-y-4">
                             <div>
                                 <label className="text-sm text-slate-300">Title</label>
-                                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
+                                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white" />
                             </div>
                             <div>
                                 <label className="text-sm text-slate-300">Description</label>
-                                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
+                                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-sm text-slate-300">Severity</label>
-                                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+                                    <select value={form.severity} onChange={e => setForm({ ...form, severity: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white">
                                         <option value="critical">Critical</option>
                                         <option value="high">High</option>
                                         <option value="medium">Medium</option>
@@ -175,12 +175,12 @@ const Incidents: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="text-sm text-slate-300">Assigned To</label>
-                                    <input value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" placeholder="analyst@company.com" />
+                                    <input value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white" placeholder="analyst@company.com" />
                                 </div>
                             </div>
                             <div className="flex justify-end gap-3 pt-2">
                                 <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-slate-400 hover:text-white transition-colors">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">Create</button>
+                                <button type="submit" className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors">Create</button>
                             </div>
                         </form>
                     </div>

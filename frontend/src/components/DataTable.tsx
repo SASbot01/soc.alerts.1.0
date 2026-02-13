@@ -23,7 +23,7 @@ interface DataTableProps<T> {
 function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, onRowClick, keyExtractor }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden backdrop-blur-sm">
+      <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden backdrop-blur-sm">
         <div className="animate-pulse">
           <div className="h-12 bg-slate-900/50 border-b border-slate-700/50" />
           {[...Array(5)].map((_, i) => (
@@ -40,7 +40,7 @@ function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, 
   }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden backdrop-blur-sm">
+    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden backdrop-blur-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
@@ -77,14 +77,14 @@ function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, 
             <button
               onClick={() => onPageChange?.(Math.max(0, (page || 0) - 1))}
               disabled={page === 0}
-              className="p-2 rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 rounded-[2px] bg-slate-700/50 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => onPageChange?.((page || 0) + 1)}
               disabled={(page || 0) + 1 >= (totalPages || 1)}
-              className="p-2 rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 rounded-[2px] bg-slate-700/50 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

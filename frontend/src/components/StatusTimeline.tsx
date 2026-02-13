@@ -23,7 +23,7 @@ const StatusTimeline: React.FC<StatusTimelineProps> = ({ steps, currentStep }) =
                 className={clsx(
                   'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
                   isCompleted && 'bg-green-500 border-green-500 text-white',
-                  isCurrent && 'bg-primary-500 border-primary-500 text-white animate-pulse',
+                  isCurrent && 'bg-white border-white text-black animate-pulse',
                   !isCompleted && !isCurrent && 'bg-slate-800 border-slate-600 text-slate-500'
                 )}
               >

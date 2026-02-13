@@ -32,7 +32,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, values, onFilterChange, 
             value={searchValue || ''}
             onChange={e => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder || 'Search...'}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50"
           />
         </div>
       )}
@@ -42,7 +42,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ filters, values, onFilterChange, 
           key={filter.key}
           value={values[filter.key] || ''}
           onChange={e => onFilterChange(filter.key, e.target.value)}
-          className="px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50 appearance-none cursor-pointer"
+          className="px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] text-sm text-white focus:outline-none focus:border-primary-500/50 appearance-none cursor-pointer"
         >
           <option value="">{filter.label}</option>
           {filter.options.map(opt => (

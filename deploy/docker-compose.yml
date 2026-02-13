@@ -1,11 +1,12 @@
-version: '3.8'
+name: blackwolf-soc
 
 services:
   mysql:
     image: mysql:8.0
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: admin
-      MYSQL_DATABASE: capitalhub
+      MYSQL_DATABASE: blackwolf
     ports:
       - "3306:3306"
     volumes:
@@ -19,6 +20,7 @@ services:
 
   minio:
     image: minio/minio
+    restart: always
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -35,6 +37,7 @@ services:
     build:
       context: ../backend
       dockerfile: ../deploy/Dockerfile.backend
+    restart: always
     ports:
       - "8081:8080"
     environment:
@@ -44,8 +47,15 @@ services:
       MYSQL_PASSWORD: admin
       MINIO_URL: http://minio:9000
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-true}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-900000}
       GLOBAL_SLACK_WEBHOOK: ${GLOBAL_SLACK_WEBHOOK:-}
       GLOBAL_SLACK_ENABLED: ${GLOBAL_SLACK_ENABLED:-true}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-4096}
+      CLAUDE_ENABLED: ${CLAUDE_ENABLED:-true}
+      CORS_ALLOWED_ORIGINS: https://soc.blackwolfsec.io,http://soc.blackwolfsec.io,http://localhost:5173,http://localhost:80
     depends_on:
       mysql:
         condition: service_healthy
@@ -60,21 +70,136 @@ services:
       dockerfile: ../deploy/Dockerfile.frontend
       args:
         VITE_API_BASE_URL: /api/v1
+    restart: always
     ports:
       - "80:80"
+    volumes:
+      - nginx_logs:/var/log/nginx
     depends_on:
       - backend
     networks:
       - blackwolf-net
 
-  # Optional Cloudflare Tunnel
-  # tunnel:
-  #   image: cloudflare/cloudflared
-  #   command: tunnel run
-  #   environment:
-  #     TUNNEL_TOKEN: ${TUNNEL_TOKEN}
-  #   networks:
-  #     - blackwolf-net
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: eyJhIjoiZTI4YjU5NjQ4ZGI0ZTc1NTEwZDljNWE3MDQwZjFjNmMiLCJ0IjoiMDk2OWM2NWEtMWJlYS00YTE0LTkxYTQtNzAxODFiYjYxNjRhIiwicyI6Ik1EZGxZall3TXpBdFlqRmhPUzAwTnpBeExUbGtNekF0T1RBMk5UWTRNVGMzT0dWbSJ9
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - blackwolf-net
+
+  suricata:
+    image: jasonish/suricata:7.0
+    restart: always
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - suricata_logs:/var/log/suricata
+      - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ./suricata/threshold.config:/etc/suricata/threshold.config:ro
+      - ./suricata/scan-detect.rules:/etc/suricata/scan-detect.rules:ro
+    entrypoint:
+      - suricata
+      - -c
+      - /etc/suricata/suricata.yaml
+      - -i
+      - ${SURICATA_INTERFACE:-enp1s0}
+
+  suricata-bridge:
+    build:
+      context: ./suricata-bridge
+    restart: always
+    depends_on:
+      - backend
+      - suricata
+    volumes:
+      - suricata_logs:/var/log/suricata:ro
+    environment:
+      EVE_JSON_PATH: /var/log/suricata/eve.json
+      SOC_API_URL: http://backend:8080/api/v1
+      SOC_API_KEY: ${SOC_API_KEY}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID}
+      SOC_SENSOR_ID: ${SOC_SENSOR_ID:-sensor-suricata-ids}
+      BRIDGE_BATCH_INTERVAL: ${BRIDGE_BATCH_INTERVAL:-10}
+    networks:
+      - blackwolf-net
+
+  auth-monitor:
+    build:
+      context: ./auth-monitor
+    restart: always
+    depends_on:
+      - backend
+    volumes:
+      - /var/log/auth.log:/var/log/auth.log:ro
+    environment:
+      AUTH_LOG_PATH: /var/log/auth.log
+      SOC_API_URL: http://backend:8080/api/v1
+      SOC_API_KEY: ${SOC_API_KEY}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID}
+      SOC_SENSOR_ID: sensor-auth-monitor
+      BRIDGE_BATCH_INTERVAL: ${BRIDGE_BATCH_INTERVAL:-10}
+    networks:
+      - blackwolf-net
+
+  honeypot:
+    build:
+      context: ./honeypot
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "${HONEYPOT_SSH_PORT:-2222}:2222"
+      - "${HONEYPOT_HTTP_PORT:-8443}:8443"
+      - "${HONEYPOT_FTP_PORT:-2121}:2121"
+      - "${HONEYPOT_TELNET_PORT:-2323}:2323"
+      - "${HONEYPOT_SMTP_PORT:-2525}:2525"
+      - "${HONEYPOT_MYSQL_PORT:-13306}:13306"
+      - "${HONEYPOT_RDP_PORT:-13389}:13389"
+    environment:
+      HONEYPOT_SSH_PORT: "2222"
+      HONEYPOT_HTTP_PORT: "8443"
+      HONEYPOT_FTP_PORT: "2121"
+      HONEYPOT_TELNET_PORT: "2323"
+      HONEYPOT_SMTP_PORT: "2525"
+      HONEYPOT_MYSQL_PORT: "13306"
+      HONEYPOT_RDP_PORT: "13389"
+      SOC_API_URL: http://backend:8080/api/v1
+      SOC_API_KEY: ${SOC_API_KEY}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID}
+      SOC_SENSOR_ID: sensor-honeypot
+      BRIDGE_BATCH_INTERVAL: ${BRIDGE_BATCH_INTERVAL:-10}
+      HOST_IP: ${HOST_IP:-192.168.1.39}
+    networks:
+      - blackwolf-net
+
+  nginx-monitor:
+    build:
+      context: ./nginx-monitor
+    restart: always
+    depends_on:
+      - frontend
+      - backend
+    volumes:
+      - nginx_logs:/var/log/nginx:ro
+    environment:
+      ACCESS_LOG_PATH: /var/log/nginx/access.log
+      SOC_API_URL: http://backend:8080/api/v1
+      SOC_API_KEY: ${SOC_API_KEY}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID}
+      SOC_SENSOR_ID: sensor-nginx-waf
+      BRIDGE_BATCH_INTERVAL: ${BRIDGE_BATCH_INTERVAL:-10}
+      HOST_IP: ${HOST_IP:-192.168.1.39}
+      SCAN_THRESHOLD: "20"
+    networks:
+      - blackwolf-net
 
 networks:
   blackwolf-net:
@@ -83,3 +208,5 @@ networks:
 volumes:
   mysql_data:
   minio_data:
+  suricata_logs:
+  nginx_logs:

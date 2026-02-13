@@ -27,13 +27,13 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidt
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`relative ${maxWidth} w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden`}
+            className={`relative ${maxWidth} w-full bg-slate-900 border border-slate-700 rounded-[2px] shadow-2xl overflow-hidden`}
           >
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <h2 className="text-lg font-semibold text-white">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-[2px] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

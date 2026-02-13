@@ -83,7 +83,7 @@ const AuditDetail: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/audits')} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors">
+                <button onClick={() => navigate('/audits')} className="p-2 hover:bg-slate-800 rounded-[2px] text-slate-400 transition-colors">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex-1">
@@ -91,29 +91,29 @@ const AuditDetail: React.FC = () => {
                     <p className="text-sm text-slate-400">{audit.auditType} Audit</p>
                 </div>
                 {canAdvance && (
-                    <button onClick={() => setShowAdvance(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                    <button onClick={() => setShowAdvance(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium transition-colors">
                         Advance <ChevronRight className="w-4 h-4" />
                     </button>
                 )}
             </div>
 
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6">
                 <StatusTimeline steps={AUDIT_STEPS} currentStep={audit.status} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
                     {/* Scope */}
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5">
                         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Scope</h3>
                         <p className="text-slate-300 text-sm whitespace-pre-wrap">{audit.scope || 'No scope defined'}</p>
                     </div>
 
                     {/* Findings */}
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Findings ({audit.findings.length})</h3>
-                            <button onClick={() => setShowAddFinding(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition-colors">
+                            <button onClick={() => setShowAddFinding(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-[2px] text-xs font-medium transition-colors">
                                 <Plus className="w-3.5 h-3.5" /> Add Finding
                             </button>
                         </div>
@@ -122,7 +122,7 @@ const AuditDetail: React.FC = () => {
                         ) : (
                             <div className="space-y-3">
                                 {audit.findings.map(f => (
-                                    <div key={f.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
+                                    <div key={f.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-[2px] border border-slate-700/30">
                                         <div className="flex items-center gap-3">
                                             <SeverityBadge level={f.riskLevel} score={f.cvssScore} />
                                             <span className="text-sm text-white font-medium">{f.title}</span>
@@ -141,7 +141,7 @@ const AuditDetail: React.FC = () => {
 
                     {/* Executive Summary */}
                     {audit.executiveSummary && (
-                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5">
                             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Executive Summary</h3>
                             <p className="text-slate-300 text-sm whitespace-pre-wrap">{audit.executiveSummary}</p>
                         </div>
@@ -150,7 +150,7 @@ const AuditDetail: React.FC = () => {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-3">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5 space-y-3">
                         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Details</h3>
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-400">Lead Auditor</span>
@@ -171,7 +171,7 @@ const AuditDetail: React.FC = () => {
                     </div>
 
                     {/* Activity Log */}
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5">
                         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Activity Log</h3>
                         {activity.length === 0 ? (
                             <p className="text-slate-500 text-sm">No activity yet.</p>
@@ -199,11 +199,11 @@ const AuditDetail: React.FC = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Title</label>
-                        <input value={findingForm.title} onChange={e => setFindingForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500" />
+                        <input value={findingForm.title} onChange={e => setFindingForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Risk Level</label>
-                        <select value={findingForm.riskLevel} onChange={e => setFindingForm(p => ({ ...p, riskLevel: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                        <select value={findingForm.riskLevel} onChange={e => setFindingForm(p => ({ ...p, riskLevel: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm">
                             <option value="CRITICAL">Critical</option>
                             <option value="HIGH">High</option>
                             <option value="MEDIUM">Medium</option>
@@ -213,23 +213,23 @@ const AuditDetail: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">CVSS Score</label>
-                        <input type="number" step="0.1" min="0" max="10" value={findingForm.cvssScore} onChange={e => setFindingForm(p => ({ ...p, cvssScore: parseFloat(e.target.value) }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                        <input type="number" step="0.1" min="0" max="10" value={findingForm.cvssScore} onChange={e => setFindingForm(p => ({ ...p, cvssScore: parseFloat(e.target.value) }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Affected Asset</label>
-                        <input value={findingForm.affectedAsset} onChange={e => setFindingForm(p => ({ ...p, affectedAsset: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                        <input value={findingForm.affectedAsset} onChange={e => setFindingForm(p => ({ ...p, affectedAsset: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Description</label>
-                        <textarea value={findingForm.description} onChange={e => setFindingForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                        <textarea value={findingForm.description} onChange={e => setFindingForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Recommendation</label>
-                        <textarea value={findingForm.recommendation} onChange={e => setFindingForm(p => ({ ...p, recommendation: e.target.value }))} rows={2} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                        <textarea value={findingForm.recommendation} onChange={e => setFindingForm(p => ({ ...p, recommendation: e.target.value }))} rows={2} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <button onClick={() => setShowAddFinding(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm">Cancel</button>
-                        <button onClick={handleAddFinding} disabled={!findingForm.title} className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">Add Finding</button>
+                        <button onClick={() => setShowAddFinding(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm">Cancel</button>
+                        <button onClick={handleAddFinding} disabled={!findingForm.title} className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium disabled:opacity-50">Add Finding</button>
                     </div>
                 </div>
             </Modal>

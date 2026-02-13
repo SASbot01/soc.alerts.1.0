@@ -61,7 +61,7 @@ const OnboardingRequests: React.FC = () => {
                 <p className="text-slate-400">{pendingCount} pending requests awaiting review</p>
             </div>
 
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-slate-700/50">
@@ -110,7 +110,7 @@ const OnboardingRequests: React.FC = () => {
             {/* Credentials Modal - shown after approving */}
             {credentials && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-slate-900 border border-green-500/30 rounded-2xl p-6 w-full max-w-lg">
+                    <div className="bg-slate-900 border border-green-500/30 rounded-[2px] p-6 w-full max-w-lg">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
                                 <Key className="w-5 h-5 text-green-400" />
@@ -121,7 +121,7 @@ const OnboardingRequests: React.FC = () => {
                             </div>
                         </div>
 
-                        <p className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-[2px] p-3 mb-4">
                             Save these credentials now. The temporary password will not be shown again.
                         </p>
 
@@ -134,7 +134,7 @@ const OnboardingRequests: React.FC = () => {
                         </div>
 
                         <div className="mt-6 flex justify-end">
-                            <button onClick={() => setCredentials(null)} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                            <button onClick={() => setCredentials(null)} className="px-6 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors">
                                 Done
                             </button>
                         </div>
@@ -145,7 +145,7 @@ const OnboardingRequests: React.FC = () => {
             {/* Detail Modal */}
             {selected && !credentials && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setSelected(null)}>
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="bg-slate-900 border border-slate-700 rounded-[2px] p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <h2 className="text-xl font-bold text-white mb-4">Onboarding Request: {selected.companyName}</h2>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -203,8 +203,8 @@ const OnboardingRequests: React.FC = () => {
 
                             {selected.status === 'pending' && (
                                 <div className="flex gap-3">
-                                    <button onClick={() => handleReview(selected.id, 'rejected')} className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-colors">Reject</button>
-                                    <button onClick={() => handleReview(selected.id, 'approved')} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">Approve</button>
+                                    <button onClick={() => handleReview(selected.id, 'rejected')} className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-[2px] transition-colors">Reject</button>
+                                    <button onClick={() => handleReview(selected.id, 'approved')} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-[2px] transition-colors">Approve</button>
                                 </div>
                             )}
                         </div>
@@ -216,7 +216,7 @@ const OnboardingRequests: React.FC = () => {
 };
 
 const CredentialRow: React.FC<{ label: string; value: string; onCopy: (v: string) => void }> = ({ label, value, onCopy }) => (
-    <div className="flex items-center justify-between bg-slate-800 rounded-lg px-4 py-2.5">
+    <div className="flex items-center justify-between bg-slate-800 rounded-[2px] px-4 py-2.5">
         <div>
             <div className="text-xs text-slate-500">{label}</div>
             <div className="text-sm text-white font-mono">{value}</div>

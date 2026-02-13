@@ -1,14 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import api from '../lib/api';
 import { ShieldAlert, Radio, Activity, Globe, ArrowUpRight, Download, FileText } from 'lucide-react';
 import { reportService } from '../lib/services';
+import RiskScoreGauge from '../components/RiskScoreGauge';
+import ThreatMap from '../components/ThreatMap';
+import { useSseEvents } from '../hooks/useSseEvents';
+import { useAuth } from '../context/AuthContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard: React.FC = () => {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [mapRefresh, setMapRefresh] = useState(0);
+    const { user } = useAuth();
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             const res = await api.get('/dashboard/overview');
             setData(res.data);
@@ -17,13 +23,24 @@ const Dashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // SSE: refresh dashboard + map on new threats/incidents
+    useSseEvents({
+        companyId: user?.companyId || null,
+        onThreat: useCallback(() => {
+            fetchData();
+            setMapRefresh(prev => prev + 1);
+        }, [fetchData]),
+        onIncident: useCallback(() => { fetchData(); }, [fetchData]),
+        onDashboardUpdate: useCallback(() => { fetchData(); }, [fetchData]),
+    });
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 30000); // 30s poll
+        const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchData]);
 
     if (loading) return <div className="p-8 text-slate-400">Loading dashboard data...</div>;
     if (!data) return <div className="p-8 text-red-400">Failed to load data.</div>;
@@ -46,10 +63,10 @@ const Dashboard: React.FC = () => {
                     <p className="text-slate-400">Real-time threat monitoring for <span className="text-primary-400 font-medium">{data.company.name}</span></p>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => reportService.downloadExecutivePDF()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+                    <button onClick={() => reportService.downloadExecutivePDF()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm transition-colors">
                         <FileText className="w-4 h-4" /> PDF Report
                     </button>
-                    <button onClick={() => reportService.downloadThreatsCSV()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors">
+                    <button onClick={() => reportService.downloadThreatsCSV()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm transition-colors">
                         <Download className="w-4 h-4" /> CSV
                     </button>
                 </div>
@@ -58,9 +75,9 @@ const Dashboard: React.FC = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
+                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-[2px] backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                            <div className={`p-2 rounded-[2px] ${stat.bg} ${stat.color}`}>
                                 <stat.icon className="w-6 h-6" />
                             </div>
                             <span className="flex items-center text-xs font-medium text-slate-500 bg-slate-900/50 px-2 py-1 rounded-full">
@@ -73,34 +90,40 @@ const Dashboard: React.FC = () => {
                 ))}
             </div>
 
+            {/* Risk Score */}
+            <RiskScoreGauge />
+
+            {/* Threat Map */}
+            <ThreatMap refreshTrigger={mapRefresh} />
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart */}
-                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-semibold text-white mb-6">Threat Distribution</h3>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
                                 <defs>
                                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#ffffff" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
+                                <XAxis dataKey="name" stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
-                                    itemStyle={{ color: '#bae6fd' }}
+                                    contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}
+                                    itemStyle={{ color: '#E0E0E0' }}
                                 />
-                                <Area type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                                <Area type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
                 {/* Recent Threats */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm overflow-hidden">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm overflow-hidden">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-semibold text-white">Recent Threats</h3>
                         <button className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors">
@@ -112,7 +135,7 @@ const Dashboard: React.FC = () => {
                             <div className="text-sm text-slate-500 text-center py-4">No recent threats detected</div>
                         ) : (
                             data.recent_threats.map((t: any) => (
-                                <div key={t.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors">
+                                <div key={t.id} className="flex items-start gap-3 p-3 rounded-[2px] bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors">
                                     <div className={`mt-1 w-2 h-2 rounded-full ${t.severity >= 4 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-yellow-500'}`} />
                                     <div>
                                         <div className="text-sm font-medium text-white">{t.threatType}</div>

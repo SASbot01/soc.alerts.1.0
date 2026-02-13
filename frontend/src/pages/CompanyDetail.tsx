@@ -42,7 +42,7 @@ const CompanyDetail: React.FC = () => {
             <div className="flex items-center gap-4">
                 <button
                     onClick={() => navigate('/superadmin/companies')}
-                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-[2px] transition-colors"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -58,9 +58,9 @@ const CompanyDetail: React.FC = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl backdrop-blur-sm">
+                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-[2px] backdrop-blur-sm">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                            <div className={`p-2 rounded-[2px] ${stat.bg} ${stat.color}`}>
                                 <stat.icon className="w-6 h-6" />
                             </div>
                         </div>
@@ -72,7 +72,7 @@ const CompanyDetail: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart */}
-                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-semibold text-white mb-6">Threat Distribution</h3>
                     <div className="h-[300px] w-full">
                         {chartData.length > 0 ? (
@@ -80,18 +80,18 @@ const CompanyDetail: React.FC = () => {
                                 <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorCompany" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                                            <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#ffffff" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
+                                    <XAxis dataKey="name" stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
-                                        itemStyle={{ color: '#bae6fd' }}
+                                        contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}
+                                        itemStyle={{ color: '#E0E0E0' }}
                                     />
-                                    <Area type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={3} fillOpacity={1} fill="url(#colorCompany)" />
+                                    <Area type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={3} fillOpacity={1} fill="url(#colorCompany)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
@@ -101,14 +101,14 @@ const CompanyDetail: React.FC = () => {
                 </div>
 
                 {/* Recent Threats */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm overflow-hidden">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm overflow-hidden">
                     <h3 className="text-lg font-semibold text-white mb-6">Recent Threats</h3>
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700">
                         {(!data.recent_threats || data.recent_threats.length === 0) ? (
                             <div className="text-sm text-slate-500 text-center py-4">No recent threats detected</div>
                         ) : (
                             data.recent_threats.map((t: any) => (
-                                <div key={t.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-900/30 border border-slate-700/30">
+                                <div key={t.id} className="flex items-start gap-3 p-3 rounded-[2px] bg-slate-900/30 border border-slate-700/30">
                                     <div className={`mt-1 w-2 h-2 rounded-full ${t.severity >= 4 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-yellow-500'}`} />
                                     <div>
                                         <div className="text-sm font-medium text-white">{t.threatType}</div>

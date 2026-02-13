@@ -69,9 +69,9 @@ const SuperAdminDashboard: React.FC = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
+                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-[2px] backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                            <div className={`p-2 rounded-[2px] ${stat.bg} ${stat.color}`}>
                                 <stat.icon className="w-6 h-6" />
                             </div>
                             <span className="flex items-center text-xs font-medium text-slate-500 bg-slate-900/50 px-2 py-1 rounded-full">
@@ -86,7 +86,7 @@ const SuperAdminDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart */}
-                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
                     <h3 className="text-lg font-semibold text-white mb-6">Global Threat Distribution</h3>
                     <div className="h-[300px] w-full">
                         {chartData.length > 0 ? (
@@ -94,18 +94,18 @@ const SuperAdminDashboard: React.FC = () => {
                                 <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                            <stop offset="5%" stopColor="#999999" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#999999" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
+                                    <XAxis dataKey="name" stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
-                                        itemStyle={{ color: '#c4b5fd' }}
+                                        contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}
+                                        itemStyle={{ color: '#E0E0E0' }}
                                     />
-                                    <Area type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorGlobal)" />
+                                    <Area type="monotone" dataKey="value" stroke="#999999" strokeWidth={3} fillOpacity={1} fill="url(#colorGlobal)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
@@ -115,7 +115,7 @@ const SuperAdminDashboard: React.FC = () => {
                 </div>
 
                 {/* Companies List */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-semibold text-white">Companies</h3>
                         <button
@@ -133,9 +133,9 @@ const SuperAdminDashboard: React.FC = () => {
                                 <button
                                     key={company.id}
                                     onClick={() => navigate(`/superadmin/company/${company.id}`)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-lg bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors text-left"
+                                    className="w-full flex items-center gap-3 p-3 rounded-[2px] bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors text-left"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                                    <div className="w-8 h-8 rounded-[2px] bg-indigo-500/10 flex items-center justify-center text-indigo-400">
                                         <Building2 className="w-4 h-4" />
                                     </div>
                                     <div className="flex-1 min-w-0">

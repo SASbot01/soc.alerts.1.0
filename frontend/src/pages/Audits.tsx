@@ -69,7 +69,7 @@ const Audits: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-white">Security Audits</h1>
-                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium transition-colors">
                     <Plus className="w-4 h-4" /> New Audit
                 </button>
             </div>
@@ -86,11 +86,11 @@ const Audits: React.FC = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Title</label>
-                        <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500" />
+                        <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Audit Type</label>
-                        <select value={form.auditType} onChange={e => setForm(p => ({ ...p, auditType: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500">
+                        <select value={form.auditType} onChange={e => setForm(p => ({ ...p, auditType: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500">
                             <option value="INFRASTRUCTURE">Infrastructure</option>
                             <option value="APPLICATION">Application</option>
                             <option value="NETWORK">Network</option>
@@ -100,15 +100,15 @@ const Audits: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Scope</label>
-                        <textarea value={form.scope} onChange={e => setForm(p => ({ ...p, scope: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500" />
+                        <textarea value={form.scope} onChange={e => setForm(p => ({ ...p, scope: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500" />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Lead Auditor</label>
-                        <input value={form.leadAuditor} onChange={e => setForm(p => ({ ...p, leadAuditor: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500" />
+                        <input value={form.leadAuditor} onChange={e => setForm(p => ({ ...p, leadAuditor: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500" />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm">Cancel</button>
-                        <button onClick={handleCreate} disabled={!form.title} className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">Create</button>
+                        <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm">Cancel</button>
+                        <button onClick={handleCreate} disabled={!form.title} className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium disabled:opacity-50">Create</button>
                     </div>
                 </div>
             </Modal>

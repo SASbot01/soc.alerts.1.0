@@ -1,6 +1,7 @@
 package com.blackwolf.backend.dto;
 
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -46,5 +47,78 @@ public class SensorDTOs {
             this.ip = ip;
             this.reason = reason;
         }
+    }
+
+    // ===== Sensor Catalog DTOs =====
+
+    @Data
+    public static class SensorTemplateResponse {
+        private String id;
+        private String name;
+        private String description;
+        private String sensorType;
+        private String category;
+        private String detectedThreats;
+        private String targetAssetTypes;
+        private String icon;
+        private String configInstructions;
+        private String setupCommand;
+        private Boolean alreadyDeployed;
+        private String deployedSensorId;
+    }
+
+    @Data
+    public static class DeploySensorRequest {
+        private String templateId;
+        private String customName;
+    }
+
+    @Data
+    public static class SensorDetailResponse {
+        private String id;
+        private String name;
+        private String companyId;
+        private String status;
+        private String sensorType;
+        private String category;
+        private String description;
+        private String detectedThreats;
+        private String targetAssetTypes;
+        private String icon;
+        private String configInstructions;
+        private String setupCommand;
+        private String sourceTemplateId;
+        private LocalDateTime registeredAt;
+        private LocalDateTime lastSeen;
+        private Long packetsProcessed;
+        private Long threatsDetected;
+        private List<AssetSensorAssignmentResponse> assignedAssets;
+    }
+
+    @Data
+    public static class AssignSensorRequest {
+        private String sensorId;
+        private String assetId;
+    }
+
+    @Data
+    public static class BulkAssignSensorRequest {
+        private String sensorId;
+        private List<String> assetIds;
+    }
+
+    @Data
+    public static class AssetSensorAssignmentResponse {
+        private String assetId;
+        private String assetName;
+        private String assetType;
+        private String assetIp;
+        private String sensorId;
+        private String sensorName;
+        private String sensorType;
+        private String category;
+        private Boolean isActive;
+        private LocalDateTime assignedAt;
+        private String assignedBy;
     }
 }

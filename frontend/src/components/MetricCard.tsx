@@ -24,9 +24,9 @@ const MetricCard: React.FC<MetricCardProps> = ({ icon: Icon, label, value, targe
   const progress = target && current != null ? Math.min(100, (current / target) * 100) : null;
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 backdrop-blur-sm">
+    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-5 backdrop-blur-sm">
       <div className="flex items-start justify-between mb-3">
-        <div className={clsx('w-10 h-10 rounded-lg flex items-center justify-center border', colorMap[color])}>
+        <div className={clsx('w-10 h-10 rounded-[2px] flex items-center justify-center border', colorMap[color])}>
           <Icon className="w-5 h-5" />
         </div>
       </div>

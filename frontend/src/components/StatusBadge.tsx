@@ -43,7 +43,7 @@ interface StatusBadgeProps {
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
   const colorClass = statusColors[status] || 'bg-slate-500/20 text-slate-400';
   return (
-    <span className={clsx('px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider', colorClass, className)}>
+    <span className={clsx('px-2.5 py-1 rounded-[2px] text-xs font-semibold uppercase tracking-wider', colorClass, className)}>
       {status.replace(/_/g, ' ')}
     </span>
   );

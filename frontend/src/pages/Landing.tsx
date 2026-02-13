@@ -42,13 +42,13 @@ const Landing: React.FC = () => {
                     <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-primary-900/10 blur-[100px]" />
                     <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] rounded-full bg-indigo-900/10 blur-[100px]" />
                 </div>
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 max-w-md text-center relative z-10">
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-[2px] p-8 max-w-md text-center relative z-10">
                     <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Check className="w-8 h-8 text-green-400" />
                     </div>
                     <h2 className="text-2xl font-bold text-white mb-2">Request Submitted</h2>
                     <p className="text-slate-400 mb-6">Our team will review your request and contact you within 24-48 hours.</p>
-                    <button onClick={() => navigate('/login')} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition-colors">
+                    <button onClick={() => navigate('/login')} className="px-6 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors">
                         Go to Login
                     </button>
                 </div>
@@ -70,9 +70,9 @@ const Landing: React.FC = () => {
             <header className="relative z-10 flex items-center justify-between px-8 py-6">
                 <div className="flex items-center gap-2">
                     <ShieldAlert className="w-8 h-8 text-primary-400" />
-                    <span className="text-2xl font-bold bg-gradient-to-r from-primary-400 to-indigo-500 bg-clip-text text-transparent">BlackWolf Defense</span>
+                    <span className="text-2xl font-bold headline-metallic">BlackWolf Defense</span>
                 </div>
-                <button onClick={() => navigate('/login')} className="px-4 py-2 text-slate-400 hover:text-white border border-slate-700 rounded-xl transition-colors">
+                <button onClick={() => navigate('/login')} className="px-4 py-2 text-slate-400 hover:text-white border border-slate-700 rounded-[2px] transition-colors">
                     Client Login
                 </button>
             </header>
@@ -82,7 +82,7 @@ const Landing: React.FC = () => {
                 <div className="relative z-10 max-w-4xl mx-auto text-center px-4 py-16">
                     <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
                         Enterprise-Grade <br />
-                        <span className="bg-gradient-to-r from-primary-400 to-indigo-500 bg-clip-text text-transparent">Security Operations</span>
+                        <span className="headline-metallic">Security Operations</span>
                     </h1>
                     <p className="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
                         24/7 threat monitoring, incident response, and compliance management powered by advanced AI correlation engines.
@@ -95,7 +95,7 @@ const Landing: React.FC = () => {
                             { icon: Globe, label: 'Threat Intel', desc: 'Global enrichment' },
                             { icon: Mail, label: 'Alert System', desc: 'Multi-channel' },
                         ].map((f, i) => (
-                            <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 text-center">
+                            <div key={i} className="bg-slate-900/50 border border-slate-800 rounded-[2px] p-4 text-center">
                                 <f.icon className="w-8 h-8 text-primary-400 mx-auto mb-2" />
                                 <div className="text-white font-medium">{f.label}</div>
                                 <div className="text-sm text-slate-500">{f.desc}</div>
@@ -103,7 +103,7 @@ const Landing: React.FC = () => {
                         ))}
                     </div>
 
-                    <button onClick={() => setStep(1)} className="px-8 py-3 bg-gradient-to-r from-primary-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 transition-all flex items-center gap-2 mx-auto">
+                    <button onClick={() => setStep(1)} className="px-8 py-3 bg-white text-black font-semibold rounded-[2px] shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 transition-all flex items-center gap-2 mx-auto">
                         Request Access <ArrowRight className="w-5 h-5" />
                     </button>
                 </div>
@@ -117,7 +117,7 @@ const Landing: React.FC = () => {
                         {steps.map((_s, i) => (
                             <React.Fragment key={i}>
                                 <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition-all",
-                                    i + 1 <= step ? "bg-primary-600 border-primary-500 text-white" : "border-slate-700 text-slate-500"
+                                    i + 1 <= step ? "bg-white border-white text-black" : "border-slate-700 text-slate-500"
                                 )}>{i + 1}</div>
                                 {i < steps.length - 1 && <div className={clsx("w-8 h-0.5", i + 1 < step ? "bg-primary-500" : "bg-slate-700")} />}
                             </React.Fragment>
@@ -125,9 +125,9 @@ const Landing: React.FC = () => {
                     </div>
                     <h2 className="text-2xl font-bold text-white text-center mb-6">{steps[step - 1]}</h2>
 
-                    {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+                    {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[2px] text-red-400 text-sm">{error}</div>}
 
-                    <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 space-y-4">
+                    <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-[2px] p-6 space-y-4">
                         {/* Step 1: Company Info */}
                         {step === 1 && (
                             <>
@@ -160,7 +160,7 @@ const Landing: React.FC = () => {
                                 <Checkbox label="Email Security Monitoring" checked={form.monitorEmail} onChange={v => updateForm({ monitorEmail: v })} />
                                 <div className="mt-4">
                                     <label className="text-sm text-slate-300">Current Security Tools</label>
-                                    <textarea value={form.currentSecurityTools} onChange={e => updateForm({ currentSecurityTools: e.target.value })} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="List your current security tools..." />
+                                    <textarea value={form.currentSecurityTools} onChange={e => updateForm({ currentSecurityTools: e.target.value })} rows={2} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm" placeholder="List your current security tools..." />
                                 </div>
                             </>
                         )}
@@ -175,7 +175,7 @@ const Landing: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="text-sm text-slate-300">Additional Notes</label>
-                                    <textarea value={form.additionalNotes} onChange={e => updateForm({ additionalNotes: e.target.value })} rows={3} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm" placeholder="Any special requirements..." />
+                                    <textarea value={form.additionalNotes} onChange={e => updateForm({ additionalNotes: e.target.value })} rows={3} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm" placeholder="Any special requirements..." />
                                 </div>
                             </>
                         )}
@@ -187,7 +187,7 @@ const Landing: React.FC = () => {
                                 <Input label="Slack Webhook (optional)" value={form.alertSlackWebhook} onChange={v => updateForm({ alertSlackWebhook: v })} placeholder="https://hooks.slack.com/..." />
                                 <div>
                                     <label className="text-sm text-slate-300">Preferred SLA</label>
-                                    <select value={form.preferredSla} onChange={e => updateForm({ preferredSla: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
+                                    <select value={form.preferredSla} onChange={e => updateForm({ preferredSla: e.target.value })} className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm">
                                         <option value="basic">Basic (24h response)</option>
                                         <option value="standard">Standard (8h response)</option>
                                         <option value="premium">Premium (2h response)</option>
@@ -204,11 +204,11 @@ const Landing: React.FC = () => {
                             Back
                         </button>
                         {step < 5 ? (
-                            <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition-colors flex items-center gap-2">
+                            <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors flex items-center gap-2">
                                 Next <ArrowRight className="w-4 h-4" />
                             </button>
                         ) : (
-                            <button onClick={handleSubmit} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors">
+                            <button onClick={handleSubmit} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-[2px] transition-colors">
                                 Submit Request
                             </button>
                         )}
@@ -229,14 +229,14 @@ const Input: React.FC<{ label: string; value: string; onChange: (v: string) => v
     <div>
         <label className="text-sm text-slate-300">{label}{required && ' *'}</label>
         <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} required={required}
-            className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all" />
+            className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all" />
     </div>
 );
 
 const Checkbox: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
     <label className="flex items-center gap-3 cursor-pointer group">
         <div className={clsx("w-5 h-5 rounded border flex items-center justify-center transition-all",
-            checked ? "bg-primary-600 border-primary-500" : "border-slate-600 group-hover:border-slate-400"
+            checked ? "bg-white border-white" : "border-slate-600 group-hover:border-slate-400"
         )}>
             {checked && <Check className="w-3 h-3 text-white" />}
         </div>

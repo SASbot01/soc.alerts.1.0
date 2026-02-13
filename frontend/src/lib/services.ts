@@ -17,6 +17,9 @@ import type {
   AlertConfiguration,
   AlertHistory,
   OnboardingRequest,
+  ChatResponse,
+  ChatSessionSummary,
+  ChatHistoryResponse,
 } from '../types';
 
 // ===== User Management =====
@@ -61,6 +64,30 @@ export const threatService = {
 
 export const sensorService = {
   list: () => api.get<Sensor[]>('/sensors').then(r => r.data),
+
+  getDetail: (id: string) =>
+    api.get(`/sensors/${id}`).then(r => r.data),
+
+  listCatalog: () =>
+    api.get('/sensors/catalog').then(r => r.data),
+
+  deploy: (data: { templateId: string; customName?: string }) =>
+    api.post('/sensors/catalog/deploy', data).then(r => r.data),
+
+  remove: (id: string) =>
+    api.delete(`/sensors/${id}`).then(r => r.data),
+
+  assignToAsset: (data: { sensorId: string; assetId: string }) =>
+    api.post('/sensors/assignments', data).then(r => r.data),
+
+  bulkAssign: (data: { sensorId: string; assetIds: string[] }) =>
+    api.post('/sensors/assignments/bulk', data).then(r => r.data),
+
+  unassignFromAsset: (sensorId: string, assetId: string) =>
+    api.delete(`/sensors/assignments/${sensorId}/${assetId}`).then(r => r.data),
+
+  getAssignments: (sensorId: string) =>
+    api.get(`/sensors/${sensorId}/assignments`).then(r => r.data),
 };
 
 // ===== Audits =====
@@ -191,6 +218,99 @@ export const onboardingService = {
 
   review: (id: string, status: string) =>
     api.put(`/onboarding/requests/${id}/review`, { status }).then(r => r.data),
+};
+
+// ===== AI Chat =====
+
+export const chatService = {
+  sendMessage: (data: { message: string; sessionId?: string }) =>
+    api.post<ChatResponse>('/chat/send', data).then(r => r.data),
+
+  listSessions: () =>
+    api.get<ChatSessionSummary[]>('/chat/sessions').then(r => r.data),
+
+  getSessionHistory: (sessionId: string) =>
+    api.get<ChatHistoryResponse>(`/chat/sessions/${sessionId}`).then(r => r.data),
+
+  deleteSession: (sessionId: string) =>
+    api.delete(`/chat/sessions/${sessionId}`).then(r => r.data),
+};
+
+// ===== Playbooks =====
+
+export const playbookService = {
+  list: () => api.get('/playbooks').then(r => r.data),
+
+  getDetail: (id: string) =>
+    api.get(`/playbooks/${id}`).then(r => r.data),
+
+  create: (data: Record<string, unknown>) =>
+    api.post('/playbooks', data).then(r => r.data),
+
+  toggleActive: (id: string) =>
+    api.patch(`/playbooks/${id}/toggle`).then(r => r.data),
+
+  execute: (id: string) =>
+    api.post(`/playbooks/${id}/execute`).then(r => r.data),
+
+  getExecutions: () =>
+    api.get('/playbooks/executions').then(r => r.data),
+
+  getExecutionDetail: (id: string) =>
+    api.get(`/playbooks/executions/${id}`).then(r => r.data),
+
+  listTemplates: () =>
+    api.get('/playbooks/templates').then(r => r.data),
+
+  deployTemplate: (data: { templateId: string; activateImmediately: boolean }) =>
+    api.post('/playbooks/templates/deploy', data).then(r => r.data),
+
+  assignToAsset: (data: { playbookId: string; assetId: string; priority?: number }) =>
+    api.post('/playbooks/assignments', data).then(r => r.data),
+
+  bulkAssign: (data: { playbookId: string; assetIds: string[] }) =>
+    api.post('/playbooks/assignments/bulk', data).then(r => r.data),
+
+  unassignFromAsset: (playbookId: string, assetId: string) =>
+    api.delete(`/playbooks/assignments/${playbookId}/${assetId}`).then(r => r.data),
+
+  getPlaybookAssignments: (playbookId: string) =>
+    api.get(`/playbooks/${playbookId}/assignments`).then(r => r.data),
+};
+
+// ===== Assets =====
+
+export const assetService = {
+  list: (params?: Record<string, string>) =>
+    api.get('/assets', { params }).then(r => r.data),
+
+  getDetail: (id: string) =>
+    api.get(`/assets/${id}`).then(r => r.data),
+
+  create: (data: Record<string, unknown>) =>
+    api.post('/assets', data).then(r => r.data),
+
+  update: (id: string, data: Record<string, unknown>) =>
+    api.put(`/assets/${id}`, data).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete(`/assets/${id}`).then(r => r.data),
+
+  getDashboard: () =>
+    api.get('/assets/dashboard').then(r => r.data),
+};
+
+// ===== MITRE ATT&CK =====
+
+export const mitreService = {
+  listTechniques: () =>
+    api.get('/mitre/techniques').then(r => r.data),
+
+  getMappings: (threatId: string) =>
+    api.get(`/mitre/threat/${threatId}/mappings`).then(r => r.data),
+
+  mapThreat: (threatId: string, techniqueId: string, confidence: number) =>
+    api.post(`/mitre/threat/${threatId}/map`, { techniqueId, confidence }).then(r => r.data),
 };
 
 // ===== Reports =====

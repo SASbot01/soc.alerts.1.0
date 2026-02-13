@@ -3,10 +3,11 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, ShieldAlert, Radio, LogOut, Settings, Menu,
-    ClipboardCheck, Crosshair, Bug, Award, BarChart3, Users, Building2,
-    AlertCircle, Bell, FileText
+    ClipboardCheck, Crosshair, Bug, Award, Users, Building2,
+    AlertCircle, Bell, FileText, Zap, Server
 } from 'lucide-react';
 import clsx from 'clsx';
+import AiChatWidget from './AiChatWidget';
 
 const Layout: React.FC = () => {
     const { user, logout } = useAuth();
@@ -27,6 +28,8 @@ const Layout: React.FC = () => {
         { name: 'Overview', path: '/', icon: LayoutDashboard },
         { name: 'Threats', path: '/threats', icon: ShieldAlert },
         { name: 'Incidents', path: '/incidents', icon: AlertCircle },
+        { name: 'Playbooks', path: '/playbooks', icon: Zap },
+        { name: 'Assets', path: '/assets', icon: Server },
         { name: 'Sensors', path: '/sensors', icon: Radio },
         { name: 'Alerts', path: '/alerts', icon: Bell },
     ];
@@ -36,7 +39,6 @@ const Layout: React.FC = () => {
         { name: 'Pentests', path: '/pentests', icon: Crosshair },
         { name: 'Vulnerabilities', path: '/vulnerabilities', icon: Bug },
         { name: 'Certifications', path: '/certifications', icon: Award },
-        { name: 'SOC Metrics', path: '/soc-metrics', icon: BarChart3 },
     ];
 
     const adminNavItems = [
@@ -57,7 +59,7 @@ const Layout: React.FC = () => {
             key={item.path}
             to={item.path}
             className={clsx(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+                "flex items-center gap-3 px-4 py-3 rounded-[2px] transition-all duration-200 group",
                 isActive(item.path)
                     ? "bg-primary-500/10 text-primary-400 border border-primary-500/20"
                     : "text-slate-400 hover:bg-slate-800 hover:text-slate-100"
@@ -79,9 +81,9 @@ const Layout: React.FC = () => {
             >
                 <div className="flex items-center justify-between p-4 border-b border-slate-800">
                     <div className={clsx("flex items-center gap-2", !sidebarOpen && "lg:hidden")}>
-                        <ShieldAlert className="w-8 h-8 text-primary-500" />
-                        <span className="text-xl font-bold bg-gradient-to-r from-primary-400 to-indigo-500 bg-clip-text text-transparent">
-                            BlackWolf
+                        <ShieldAlert className="w-8 h-8 text-white" />
+                        <span className="text-xl font-bold font-display tracking-[0.1em] headline-metallic">
+                            BLACKWOLF
                         </span>
                     </div>
                 </div>
@@ -128,7 +130,7 @@ const Layout: React.FC = () => {
                     <div className="p-4 border-t border-slate-800">
                         <button
                             onClick={logout}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-xl transition-all"
+                            className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:bg-red-500/10 hover:text-red-400 rounded-[2px] transition-all"
                         >
                             <LogOut className="w-5 h-5" />
                             <span className={clsx(!sidebarOpen && "lg:hidden")}>Logout</span>
@@ -143,7 +145,7 @@ const Layout: React.FC = () => {
                 <header className="h-16 bg-slate-900/50 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 z-40">
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="p-2 text-slate-400 hover:text-white rounded-lg lg:hidden"
+                        className="p-2 text-slate-400 hover:text-white rounded-[2px] lg:hidden"
                     >
                         <Menu className="w-6 h-6" />
                     </button>
@@ -153,7 +155,7 @@ const Layout: React.FC = () => {
                             <div className="text-sm font-medium text-white">{user?.fullName}</div>
                             <div className="text-xs text-slate-400 uppercase tracking-wider">{user?.role}</div>
                         </div>
-                        <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold border-2 border-slate-800 shadow-lg">
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-black font-bold border-2 border-slate-800 shadow-lg">
                             {user?.fullName?.charAt(0) || 'U'}
                         </div>
                     </div>
@@ -164,6 +166,9 @@ const Layout: React.FC = () => {
                     <Outlet />
                 </div>
             </main>
+
+            {/* AI Chat Widget - only for non-superadmin users */}
+            {!isSuperAdmin && <AiChatWidget />}
         </div>
     );
 };

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import api from '../lib/api';
 
 interface User {
     id: string;
@@ -10,7 +11,7 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
-    login: (token: string, user: User) => void;
+    login: (accessToken: string, refreshToken: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
     loading: boolean;
@@ -32,17 +33,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
     }, []);
 
-    const login = (token: string, userData: User) => {
-        localStorage.setItem('token', token);
+    const login = useCallback((accessToken: string, refreshToken: string, userData: User) => {
+        localStorage.setItem('token', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
-    };
+    }, []);
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-    };
+    const logout = useCallback(async () => {
+        try {
+            const refreshToken = localStorage.getItem('refreshToken');
+            await api.post('/auth/logout', refreshToken ? { refreshToken } : {});
+        } catch {
+            // Ignore logout errors
+        } finally {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            setUser(null);
+        }
+    }, []);
 
     return (
         <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading }}>

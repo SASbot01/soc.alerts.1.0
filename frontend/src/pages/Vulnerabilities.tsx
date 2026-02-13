@@ -82,7 +82,7 @@ const Vulnerabilities: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-white">Vulnerabilities</h1>
-                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium transition-colors">
                     <Plus className="w-4 h-4" /> Report Vulnerability
                 </button>
             </div>
@@ -99,16 +99,16 @@ const Vulnerabilities: React.FC = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Title</label>
-                        <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500" />
+                        <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm focus:outline-none focus:border-primary-500" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">CVE ID</label>
-                            <input value={form.cveId} onChange={e => setForm(p => ({ ...p, cveId: e.target.value }))} placeholder="CVE-2024-XXXXX" className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                            <input value={form.cveId} onChange={e => setForm(p => ({ ...p, cveId: e.target.value }))} placeholder="CVE-2024-XXXXX" className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Risk Level</label>
-                            <select value={form.riskLevel} onChange={e => setForm(p => ({ ...p, riskLevel: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                            <select value={form.riskLevel} onChange={e => setForm(p => ({ ...p, riskLevel: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm">
                                 <option value="CRITICAL">Critical</option>
                                 <option value="HIGH">High</option>
                                 <option value="MEDIUM">Medium</option>
@@ -120,20 +120,20 @@ const Vulnerabilities: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">CVSS Score</label>
-                            <input type="number" step="0.1" min="0" max="10" value={form.cvssScore} onChange={e => setForm(p => ({ ...p, cvssScore: parseFloat(e.target.value) }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                            <input type="number" step="0.1" min="0" max="10" value={form.cvssScore} onChange={e => setForm(p => ({ ...p, cvssScore: parseFloat(e.target.value) }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Affected Asset</label>
-                            <input value={form.affectedAsset} onChange={e => setForm(p => ({ ...p, affectedAsset: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                            <input value={form.affectedAsset} onChange={e => setForm(p => ({ ...p, affectedAsset: e.target.value }))} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Description</label>
-                        <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" />
+                        <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-[2px] text-white text-sm" />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm">Cancel</button>
-                        <button onClick={handleCreate} disabled={!form.title} className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium disabled:opacity-50">Report</button>
+                        <button onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm">Cancel</button>
+                        <button onClick={handleCreate} disabled={!form.title} className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium disabled:opacity-50">Report</button>
                     </div>
                 </div>
             </Modal>

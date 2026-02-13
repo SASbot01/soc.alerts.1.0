@@ -41,7 +41,7 @@ const Companies: React.FC = () => {
                 <p className="text-slate-400">All registered companies in the platform</p>
             </div>
 
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -60,7 +60,7 @@ const Companies: React.FC = () => {
                                 <tr key={company.id} className="hover:bg-slate-800/30 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                                            <div className="w-8 h-8 rounded-[2px] bg-indigo-500/10 flex items-center justify-center text-indigo-400">
                                                 <Building2 className="w-4 h-4" />
                                             </div>
                                             <span className="text-sm font-medium text-white">{company.companyName}</span>
@@ -86,7 +86,7 @@ const Companies: React.FC = () => {
                                     <td className="px-6 py-4 text-right">
                                         <button
                                             onClick={() => navigate(`/superadmin/company/${company.id}`)}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-400 hover:text-primary-300 bg-primary-500/10 hover:bg-primary-500/20 border border-primary-500/20 rounded-lg transition-colors"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-400 hover:text-primary-300 bg-primary-500/10 hover:bg-primary-500/20 border border-primary-500/20 rounded-[2px] transition-colors"
                                         >
                                             View Dashboard <ExternalLink className="w-3 h-3" />
                                         </button>

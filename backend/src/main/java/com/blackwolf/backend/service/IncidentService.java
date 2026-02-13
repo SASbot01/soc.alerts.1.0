@@ -22,6 +22,9 @@ public class IncidentService {
     @Autowired
     private IncidentTimelineRepository timelineRepository;
 
+    @Autowired
+    private SseService sseService;
+
     public List<Incident> listByCompany(String companyId) {
         return incidentRepository.findByCompanyId(companyId);
     }
@@ -53,6 +56,9 @@ public class IncidentService {
 
         addTimelineEntry(incident.getId(), "Incident Created",
                 "Incident opened with severity " + request.getSeverity(), "system");
+
+        // Emit SSE event
+        sseService.emitIncident(incident);
 
         return incident;
     }

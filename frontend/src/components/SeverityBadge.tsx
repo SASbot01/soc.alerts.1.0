@@ -18,7 +18,7 @@ interface SeverityBadgeProps {
 const SeverityBadge: React.FC<SeverityBadgeProps> = ({ level, score, className }) => {
   const config = severityConfig[level] || severityConfig.INFO;
   return (
-    <span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border', config.color, className)}>
+    <span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] text-xs font-semibold border', config.color, className)}>
       {config.label}
       {score != null && <span className="opacity-75">({score})</span>}
     </span>

@@ -80,14 +80,14 @@ const Users: React.FC = () => {
                 </div>
                 <button
                     onClick={() => setShowCreate(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-indigo-600 text-white rounded-xl font-medium shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 active:scale-[0.98] transition-all"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white text-black rounded-[2px] font-medium shadow-lg shadow-primary-500/20 hover:shadow-primary-500/30 active:scale-[0.98] transition-all"
                 >
                     <Plus className="w-4 h-4" /> Add User
                 </button>
             </div>
 
             {/* Users Table */}
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -139,13 +139,13 @@ const Users: React.FC = () => {
                                         <div className="flex items-center justify-end gap-2">
                                             <button
                                                 onClick={() => openEdit(user)}
-                                                className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                                                className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-700/50 rounded-[2px] transition-colors"
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => setDeleteUser(user)}
-                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-[2px] transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -175,7 +175,7 @@ const Users: React.FC = () => {
                             type="email"
                             value={createForm.email}
                             onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                             required
                         />
                     </div>
@@ -185,7 +185,7 @@ const Users: React.FC = () => {
                             type="text"
                             value={createForm.fullName}
                             onChange={(e) => setCreateForm({ ...createForm, fullName: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                             required
                         />
                     </div>
@@ -194,7 +194,7 @@ const Users: React.FC = () => {
                         <select
                             value={createForm.role}
                             onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                         >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
@@ -206,15 +206,15 @@ const Users: React.FC = () => {
                             type="password"
                             value={createForm.password}
                             onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                             required
                         />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                        <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm font-medium transition-colors">
                             Cancel
                         </button>
-                        <button type="submit" className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                        <button type="submit" className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium transition-colors">
                             Create User
                         </button>
                     </div>
@@ -230,7 +230,7 @@ const Users: React.FC = () => {
                             type="text"
                             value={editForm.fullName}
                             onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                             required
                         />
                     </div>
@@ -239,7 +239,7 @@ const Users: React.FC = () => {
                         <select
                             value={editForm.role}
                             onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-[2px] py-2.5 px-4 text-white focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 transition-all"
                         >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
@@ -256,10 +256,10 @@ const Users: React.FC = () => {
                         </button>
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <button type="button" onClick={() => setEditUser(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                        <button type="button" onClick={() => setEditUser(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm font-medium transition-colors">
                             Cancel
                         </button>
-                        <button type="submit" className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                        <button type="submit" className="px-4 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm font-medium transition-colors">
                             Save Changes
                         </button>
                     </div>

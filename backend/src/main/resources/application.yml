@@ -2,7 +2,7 @@ spring:
   application:
     name: blackwolf-backend
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/${MYSQL_DATABASE:capitalhub}
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/${MYSQL_DATABASE:blackwolf}
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -24,8 +24,10 @@ minio:
   bucket: ${MINIO_BUCKET:blackwolf-assets}
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-  expiration: ${JWT_EXPIRATION_MS:86400000}
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION_MS:900000}
+  refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+  cookie-secure: ${JWT_COOKIE_SECURE:false}
 
 spring.mail:
   host: ${MAIL_HOST:localhost}
@@ -50,3 +52,30 @@ alerts:
   from-email: ${ALERT_FROM_EMAIL:soc@blackwolf.io}
   global-slack-webhook: ${GLOBAL_SLACK_WEBHOOK:}
   global-slack-enabled: ${GLOBAL_SLACK_ENABLED:true}
+
+# Actuator & Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: BlackWolf SOC
+    version: 2.0.0
+    description: Enterprise Security Operations Platform
+
+# AI Chat (Claude)
+ai:
+  claude:
+    api-key: ${CLAUDE_API_KEY:}
+    model: ${CLAUDE_MODEL:claude-sonnet-4-20250514}
+    max-tokens: ${CLAUDE_MAX_TOKENS:4096}
+    enabled: ${CLAUDE_ENABLED:false}

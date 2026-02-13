@@ -281,6 +281,36 @@ export interface OnboardingRequest {
   createdAt: string;
 }
 
+// ===== AI Chat =====
+
+export interface ChatMessageType {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
+export interface ChatResponse {
+  sessionId: string;
+  messageId: string;
+  content: string;
+  tokensUsed: number;
+}
+
+export interface ChatSessionSummary {
+  id: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatHistoryResponse {
+  sessionId: string;
+  title: string;
+  messages: ChatMessageType[];
+}
+
 // ===== Threat Enrichment =====
 
 export interface ThreatEnrichment {

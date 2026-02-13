@@ -12,7 +12,6 @@ import PentestDetail from './pages/PentestDetail';
 import Vulnerabilities from './pages/Vulnerabilities';
 import VulnerabilityDetail from './pages/VulnerabilityDetail';
 import Certifications from './pages/Certifications';
-import SocMetrics from './pages/SocMetrics';
 import Incidents from './pages/Incidents';
 import IncidentDetail from './pages/IncidentDetail';
 import AlertConfig from './pages/AlertConfig';
@@ -22,7 +21,10 @@ import Users from './pages/Users';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
+import Playbooks from './pages/Playbooks';
+import Assets from './pages/Assets';
 import Layout from './components/Layout';
+import NotificationToast from './components/NotificationToast';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -40,6 +42,8 @@ const DashboardRouter: React.FC = () => {
 
 const App: React.FC = () => {
   return (
+    <>
+    <NotificationToast />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/landing" element={<Landing />} />
@@ -58,7 +62,8 @@ const App: React.FC = () => {
         <Route path="vulnerabilities" element={<Vulnerabilities />} />
         <Route path="vulnerabilities/:id" element={<VulnerabilityDetail />} />
         <Route path="certifications" element={<Certifications />} />
-        <Route path="soc-metrics" element={<SocMetrics />} />
+        <Route path="playbooks" element={<Playbooks />} />
+        <Route path="assets" element={<Assets />} />
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<Users />} />
         <Route path="superadmin/companies" element={<Companies />} />
@@ -68,6 +73,7 @@ const App: React.FC = () => {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 };
 
