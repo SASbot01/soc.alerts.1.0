@@ -2,6 +2,7 @@ package com.blackwolf.backend.service;
 
 import com.blackwolf.backend.dto.ThreatDTOs.*;
 import com.blackwolf.backend.model.ThreatEvent;
+import com.blackwolf.backend.repository.ThreatEnrichmentRepository;
 import com.blackwolf.backend.repository.ThreatEventRepository;
 import com.blackwolf.backend.specification.ThreatSpecifications;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,6 +20,9 @@ public class ThreatService {
 
     @Autowired
     private ThreatEventRepository threatEventRepository;
+
+    @Autowired
+    private ThreatEnrichmentRepository enrichmentRepository;
 
     public ThreatListResponse getThreats(String companyId, ThreatFilterRequest filter) {
         Specification<ThreatEvent> spec = ThreatSpecifications.hasCompanyId(companyId);
@@ -68,6 +73,36 @@ public class ThreatService {
         }
         event.setStatus(newStatus);
         return threatEventRepository.save(event);
+    }
+
+    public List<Map<String, Object>> getMapOrigins(String companyId) {
+        List<Object[]> origins = threatEventRepository.findMapOriginsByCompanyId(companyId);
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Object[] row : origins) {
+            String ip = (String) row[0];
+            Long count = (Long) row[1];
+            Integer maxSeverity = (Integer) row[2];
+            String threatType = (String) row[3];
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("srcIp", ip);
+            entry.put("count", count);
+            entry.put("maxSeverity", maxSeverity);
+            entry.put("threatType", threatType);
+
+            enrichmentRepository.findById(ip).ifPresent(e -> {
+                entry.put("countryCode", e.getCountryCode());
+                entry.put("isp", e.getIsp());
+                entry.put("abuseScore", e.getAbuseConfidenceScore());
+                entry.put("isTor", e.isTor());
+                entry.put("isVpn", e.isVpn());
+                entry.put("totalReports", e.getTotalReports());
+            });
+
+            result.add(entry);
+        }
+        return result;
     }
 
     private ThreatSummary toSummary(ThreatEvent e) {

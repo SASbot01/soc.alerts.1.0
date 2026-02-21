@@ -21,4 +21,13 @@ public class MitreDTOs {
         private Integer confidence;
         private LocalDateTime mappedAt;
     }
+
+    @Data
+    public static class MitreCoverageResponse {
+        private String techniqueId;
+        private String techniqueName;
+        private String tactic;
+        private long hitCount;
+        private LocalDateTime lastSeen;
+    }
 }

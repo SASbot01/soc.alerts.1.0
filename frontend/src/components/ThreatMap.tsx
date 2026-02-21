@@ -27,6 +27,10 @@ interface ThreatPoint {
     city: string;
     isp: string;
     countryCode: string;
+    abuseScore?: number;
+    isTor?: boolean;
+    isVpn?: boolean;
+    totalReports?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,45 +192,42 @@ const ThreatMap: React.FC<ThreatMapProps> = ({ refreshTrigger = 0 }) => {
     useEffect(() => {
         const fetchAndGeolocate = async () => {
             try {
-                const res = await api.get('/threats', { params: { page: 0, size: 200 } });
-                const threats = res.data.content || res.data || [];
+                // Fetch ALL unique IPs pre-aggregated from backend
+                const res = await api.get('/threats/map-origins');
+                const origins: any[] = res.data || [];
 
-                // Collect unique IPs
-                const uniqueIps = [...new Set(threats.map((t: any) => t.srcIp).filter(Boolean))] as string[];
+                // Collect unique IPs for geolocation
+                const uniqueIps = origins.map((o: any) => o.srcIp).filter(Boolean) as string[];
 
-                // Batch geolocate
+                // Batch geolocate all IPs
                 await batchGeoLocate(uniqueIps);
 
-                // Aggregate by IP
-                const ipMap = new Map<string, ThreatPoint>();
-                for (const t of threats) {
-                    const geo = geoMemCache.get(t.srcIp);
+                // Build threat points from pre-aggregated data
+                const result: ThreatPoint[] = [];
+                for (const o of origins) {
+                    const geo = geoMemCache.get(o.srcIp);
                     if (!geo) continue;
 
                     const { x, y } = geoToSvg(geo.lat, geo.lon);
-                    const key = t.srcIp;
-
-                    if (ipMap.has(key)) {
-                        const existing = ipMap.get(key)!;
-                        existing.count++;
-                        existing.severity = Math.max(existing.severity, t.severity || 0);
-                    } else {
-                        ipMap.set(key, {
-                            x, y,
-                            lat: geo.lat,
-                            lon: geo.lon,
-                            severity: t.severity || 0,
-                            srcIp: t.srcIp,
-                            threatType: t.threatType,
-                            count: 1,
-                            country: geo.country,
-                            city: geo.city,
-                            isp: geo.isp,
-                            countryCode: geo.countryCode,
-                        });
-                    }
+                    result.push({
+                        x, y,
+                        lat: geo.lat,
+                        lon: geo.lon,
+                        severity: o.maxSeverity || 0,
+                        srcIp: o.srcIp,
+                        threatType: o.threatType || 'Unknown',
+                        count: o.count || 1,
+                        country: geo.country,
+                        city: geo.city,
+                        isp: o.isp || geo.isp,
+                        countryCode: o.countryCode || geo.countryCode,
+                        abuseScore: o.abuseScore,
+                        isTor: o.isTor,
+                        isVpn: o.isVpn,
+                        totalReports: o.totalReports,
+                    });
                 }
-                setPoints(Array.from(ipMap.values()));
+                setPoints(result);
             } catch (err) {
                 console.error('ThreatMap fetch error:', err);
             } finally {
@@ -408,6 +409,18 @@ const ThreatMap: React.FC<ThreatMapProps> = ({ refreshTrigger = 0 }) => {
                             </div>
                         )}
 
+                        {/* Tor / VPN badges */}
+                        {(hovered.isTor || hovered.isVpn) && (
+                            <div className="flex gap-1.5 mb-2">
+                                {hovered.isTor && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">TOR</span>
+                                )}
+                                {hovered.isVpn && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">VPN</span>
+                                )}
+                            </div>
+                        )}
+
                         {/* Divider */}
                         <div className="border-t border-slate-700/50 my-2" />
 
@@ -426,6 +439,25 @@ const ThreatMap: React.FC<ThreatMapProps> = ({ refreshTrigger = 0 }) => {
                                 <div className="text-slate-500 text-[10px] uppercase">Type</div>
                             </div>
                         </div>
+
+                        {/* Abuse intelligence */}
+                        {hovered.abuseScore != null && (
+                            <>
+                                <div className="border-t border-slate-700/50 my-2" />
+                                <div className="grid grid-cols-2 gap-2 text-center">
+                                    <div>
+                                        <div className={`font-bold text-sm ${hovered.abuseScore >= 75 ? 'text-red-400' : hovered.abuseScore >= 40 ? 'text-orange-400' : 'text-green-400'}`}>
+                                            {hovered.abuseScore}%
+                                        </div>
+                                        <div className="text-slate-500 text-[10px] uppercase">Abuse Score</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-white font-bold text-sm">{hovered.totalReports ?? 0}</div>
+                                        <div className="text-slate-500 text-[10px] uppercase">Reports</div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         {/* Coordinates */}
                         <div className="text-slate-600 text-[10px] mt-2 font-mono">

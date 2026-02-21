@@ -41,4 +41,15 @@ public class MitreController {
         return ResponseEntity.ok(mitreService.mapThreatToTechnique(
                 threatId, request.getTechniqueId(), request.getConfidence()));
     }
+
+    @GetMapping("/coverage")
+    public ResponseEntity<List<MitreCoverageResponse>> getCoverage(Authentication auth) {
+        String companyId = authUtils.getCompanyId(auth);
+        return ResponseEntity.ok(mitreService.getCoverage(companyId));
+    }
+
+    @GetMapping("/incident/{incidentId}/mappings")
+    public ResponseEntity<List<MitreMappingResponse>> getIncidentMappings(@PathVariable String incidentId) {
+        return ResponseEntity.ok(mitreService.getMappingsForIncident(incidentId));
+    }
 }

@@ -1,5 +1,6 @@
 package com.blackwolf.backend.service;
 
+import com.blackwolf.backend.dto.MitreDTOs.MitreMappingResponse;
 import com.blackwolf.backend.model.*;
 import com.blackwolf.backend.repository.*;
 import com.lowagie.text.*;
@@ -22,6 +23,9 @@ public class ReportService {
     @Autowired private SensorRepository sensorRepository;
     @Autowired private IncidentRepository incidentRepository;
     @Autowired private BlockedIPRepository blockedIPRepository;
+    @Autowired private IncidentTimelineRepository incidentTimelineRepository;
+    @Autowired private CorrelationEventRepository correlationEventRepository;
+    @Autowired private MitreService mitreService;
 
     private static final Font TITLE_FONT = new Font(Font.HELVETICA, 22, Font.BOLD, new Color(30, 41, 59));
     private static final Font SUBTITLE_FONT = new Font(Font.HELVETICA, 14, Font.BOLD, new Color(71, 85, 105));
@@ -150,6 +154,173 @@ public class ReportService {
 
         doc.close();
         return out.toByteArray();
+    }
+
+    public byte[] generateIncidentReport(String incidentId) throws Exception {
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new RuntimeException("Incident not found"));
+
+        List<IncidentTimeline> timeline = incidentTimelineRepository.findByIncidentIdOrderByCreatedAtDesc(incidentId);
+        List<MitreMappingResponse> mitreMappings = mitreService.getMappingsForIncident(incidentId);
+        List<CorrelationEvent> correlationEvents = correlationEventRepository.findByIncidentId(incidentId);
+
+        ThreatEvent sourceThreat = null;
+        if (incident.getSourceThreatId() != null) {
+            sourceThreat = threatEventRepository.findById(incident.getSourceThreatId()).orElse(null);
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document doc = new Document(PageSize.A4, 40, 40, 50, 40);
+        PdfWriter.getInstance(doc, out);
+        doc.open();
+
+        // 1. Header
+        Paragraph title = new Paragraph("Incident Report", TITLE_FONT);
+        title.setAlignment(Element.ALIGN_CENTER);
+        doc.add(title);
+
+        Paragraph incTitle = new Paragraph(incident.getTitle(), SUBTITLE_FONT);
+        incTitle.setAlignment(Element.ALIGN_CENTER);
+        incTitle.setSpacingAfter(5);
+        doc.add(incTitle);
+
+        Paragraph dateLine = new Paragraph("Generated: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), SMALL_FONT);
+        dateLine.setAlignment(Element.ALIGN_CENTER);
+        dateLine.setSpacingAfter(15);
+        doc.add(dateLine);
+
+        // 2. Summary
+        doc.add(new Paragraph("Summary", SUBTITLE_FONT));
+        doc.add(new Paragraph("\n"));
+
+        PdfPTable summaryTable = new PdfPTable(new float[]{1.5f, 3f});
+        summaryTable.setWidthPercentage(100);
+        addSummaryRow(summaryTable, "Incident ID", incident.getId());
+        addSummaryRow(summaryTable, "Company ID", incident.getCompanyId());
+        addSummaryRow(summaryTable, "Severity", incident.getSeverity() != null ? incident.getSeverity().toUpperCase() : "-");
+        addSummaryRow(summaryTable, "Status", incident.getStatus() != null ? incident.getStatus().toUpperCase() : "-");
+        addSummaryRow(summaryTable, "Assigned To", incident.getAssignedTo() != null ? incident.getAssignedTo() : "Unassigned");
+        addSummaryRow(summaryTable, "SLA Deadline", incident.getSlaDeadline() != null ? incident.getSlaDeadline().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-");
+        addSummaryRow(summaryTable, "Created", incident.getCreatedAt() != null ? incident.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-");
+        addSummaryRow(summaryTable, "Resolved", incident.getResolvedAt() != null ? incident.getResolvedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "-");
+        summaryTable.setSpacingAfter(10);
+        doc.add(summaryTable);
+
+        if (incident.getDescription() != null && !incident.getDescription().isBlank()) {
+            doc.add(new Paragraph("Description", new Font(Font.HELVETICA, 10, Font.BOLD, new Color(51, 65, 85))));
+            Paragraph desc = new Paragraph(incident.getDescription(), BODY_FONT);
+            desc.setSpacingAfter(15);
+            doc.add(desc);
+        }
+
+        // Source Threat info
+        if (sourceThreat != null) {
+            doc.add(new Paragraph("\n"));
+            doc.add(new Paragraph("Source Threat", SUBTITLE_FONT));
+            doc.add(new Paragraph("\n"));
+
+            PdfPTable threatInfo = new PdfPTable(new float[]{1.5f, 3f});
+            threatInfo.setWidthPercentage(100);
+            addSummaryRow(threatInfo, "Threat ID", sourceThreat.getId());
+            addSummaryRow(threatInfo, "Type", sourceThreat.getThreatType());
+            addSummaryRow(threatInfo, "Severity", sourceThreat.getSeverity() != null ? sourceThreat.getSeverity().toString() : "-");
+            addSummaryRow(threatInfo, "Source IP", sourceThreat.getSrcIp());
+            addSummaryRow(threatInfo, "Target IP", sourceThreat.getDstIp());
+            addSummaryRow(threatInfo, "Status", sourceThreat.getStatus());
+            threatInfo.setSpacingAfter(15);
+            doc.add(threatInfo);
+        }
+
+        // 3. Timeline
+        if (!timeline.isEmpty()) {
+            doc.add(new Paragraph("\n"));
+            doc.add(new Paragraph("Timeline", SUBTITLE_FONT));
+            doc.add(new Paragraph("\n"));
+
+            PdfPTable timelineTable = new PdfPTable(new float[]{1.5f, 1.5f, 3f, 1.5f});
+            timelineTable.setWidthPercentage(100);
+            addHeaderCell(timelineTable, "Timestamp");
+            addHeaderCell(timelineTable, "Action");
+            addHeaderCell(timelineTable, "Description");
+            addHeaderCell(timelineTable, "Performed By");
+
+            for (IncidentTimeline entry : timeline) {
+                addBodyCell(timelineTable, entry.getCreatedAt() != null ? entry.getCreatedAt().format(DateTimeFormatter.ofPattern("MM-dd HH:mm")) : "-");
+                addBodyCell(timelineTable, entry.getAction());
+                addBodyCell(timelineTable, entry.getDescription());
+                addBodyCell(timelineTable, entry.getPerformedBy());
+            }
+            timelineTable.setSpacingAfter(15);
+            doc.add(timelineTable);
+        }
+
+        // 4. MITRE Techniques
+        if (!mitreMappings.isEmpty()) {
+            doc.add(new Paragraph("\n"));
+            doc.add(new Paragraph("MITRE ATT&CK Techniques", SUBTITLE_FONT));
+            doc.add(new Paragraph("\n"));
+
+            PdfPTable mitreTable = new PdfPTable(new float[]{1.5f, 2.5f, 2f, 1f});
+            mitreTable.setWidthPercentage(100);
+            addHeaderCell(mitreTable, "Technique ID");
+            addHeaderCell(mitreTable, "Name");
+            addHeaderCell(mitreTable, "Tactic");
+            addHeaderCell(mitreTable, "Confidence");
+
+            for (MitreMappingResponse m : mitreMappings) {
+                addBodyCell(mitreTable, m.getTechniqueId());
+                addBodyCell(mitreTable, m.getTechniqueName());
+                addBodyCell(mitreTable, m.getTactic());
+                addBodyCell(mitreTable, m.getConfidence() != null ? m.getConfidence() + "%" : "-");
+            }
+            mitreTable.setSpacingAfter(15);
+            doc.add(mitreTable);
+        }
+
+        // 5. Correlated Threats
+        if (!correlationEvents.isEmpty()) {
+            doc.add(new Paragraph("\n"));
+            doc.add(new Paragraph("Correlated Threats", SUBTITLE_FONT));
+            doc.add(new Paragraph("\n"));
+
+            PdfPTable corrTable = new PdfPTable(new float[]{2f, 2f, 2f, 2f});
+            corrTable.setWidthPercentage(100);
+            addHeaderCell(corrTable, "Rule ID");
+            addHeaderCell(corrTable, "Threat Event ID");
+            addHeaderCell(corrTable, "Matched At");
+            addHeaderCell(corrTable, "Details");
+
+            for (CorrelationEvent ce : correlationEvents) {
+                addBodyCell(corrTable, ce.getRuleId());
+                addBodyCell(corrTable, ce.getThreatEventId());
+                addBodyCell(corrTable, ce.getMatchedAt() != null ? ce.getMatchedAt().format(DateTimeFormatter.ofPattern("MM-dd HH:mm")) : "-");
+                addBodyCell(corrTable, ce.getDetails());
+            }
+            corrTable.setSpacingAfter(15);
+            doc.add(corrTable);
+        }
+
+        // 6. Footer
+        doc.add(new Paragraph("\n\n"));
+        Paragraph footer = new Paragraph("Generated by BlackWolf SOC Platform", SMALL_FONT);
+        footer.setAlignment(Element.ALIGN_CENTER);
+        doc.add(footer);
+
+        doc.close();
+        return out.toByteArray();
+    }
+
+    private void addSummaryRow(PdfPTable table, String label, String value) {
+        PdfPCell labelCell = new PdfPCell(new Phrase(label, new Font(Font.HELVETICA, 9, Font.BOLD, new Color(71, 85, 105))));
+        labelCell.setPadding(5);
+        labelCell.setBorderColor(new Color(226, 232, 240));
+        labelCell.setBackgroundColor(new Color(241, 245, 249));
+        table.addCell(labelCell);
+
+        PdfPCell valueCell = new PdfPCell(new Phrase(value != null ? value : "-", BODY_FONT));
+        valueCell.setPadding(5);
+        valueCell.setBorderColor(new Color(226, 232, 240));
+        table.addCell(valueCell);
     }
 
     // CSV exports

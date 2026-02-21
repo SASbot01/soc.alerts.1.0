@@ -9,6 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/threats")
 public class ThreatController {
@@ -46,6 +49,12 @@ public class ThreatController {
         filter.setSortDir(sortDir);
 
         return ResponseEntity.ok(threatService.getThreats(companyId, filter));
+    }
+
+    @GetMapping("/map-origins")
+    public ResponseEntity<List<Map<String, Object>>> getMapOrigins(Authentication authentication) {
+        String companyId = authUtils.getCompanyId(authentication);
+        return ResponseEntity.ok(threatService.getMapOrigins(companyId));
     }
 
     @PatchMapping("/{id}/status")

@@ -311,6 +311,16 @@ export interface ChatHistoryResponse {
   messages: ChatMessageType[];
 }
 
+// ===== MITRE Coverage =====
+
+export interface MitreCoverageItem {
+  techniqueId: string;
+  techniqueName: string;
+  tactic: string;
+  hitCount: number;
+  lastSeen: string | null;
+}
+
 // ===== Threat Enrichment =====
 
 export interface ThreatEnrichment {

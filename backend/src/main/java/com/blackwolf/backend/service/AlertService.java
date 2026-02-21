@@ -108,8 +108,8 @@ public class AlertService {
             }
         }
 
-        // Global Slack alert
-        sendGlobalSlackThreat(threat, companyName);
+        // Global Slack per-event alerts disabled.
+        // Consolidated reports are sent every 6 hours by AiThreatAnalystService.
     }
 
     // Fire alerts for an incident
@@ -143,8 +143,8 @@ public class AlertService {
             }
         }
 
-        // Global Slack alert
-        sendGlobalSlackIncident(companyName, incidentId, title, severity);
+        // Global Slack per-event alerts disabled.
+        // Consolidated reports are sent every 6 hours by AiThreatAnalystService.
     }
 
     private void sendEmail(String to, String subject, String body) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MessageSquare, Send } from 'lucide-react';
-import { incidentService } from '../lib/services';
+import { ArrowLeft, Clock, MessageSquare, Send, Download } from 'lucide-react';
+import { incidentService, reportService } from '../lib/services';
 import type { IncidentDetailResponse } from '../types';
 import clsx from 'clsx';
 
@@ -84,9 +84,17 @@ const IncidentDetail: React.FC = () => {
                             {isSlaBreached && <span className="text-xs font-medium text-red-400 bg-red-500/10 px-2 py-0.5 rounded">SLA BREACHED</span>}
                         </div>
                     </div>
+                    <div className="flex flex-col items-end gap-2">
+                        <button
+                            onClick={() => id && reportService.downloadIncidentPDF(id)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] text-sm transition-colors"
+                        >
+                            <Download className="w-4 h-4" /> Download PDF
+                        </button>
                     <div className="text-right text-sm text-slate-400">
                         <div>Created: {new Date(incident.createdAt).toLocaleString()}</div>
                         {incident.slaDeadline && <div className="flex items-center gap-1 justify-end mt-1"><Clock className="w-3 h-3" /> SLA: {new Date(incident.slaDeadline).toLocaleString()}</div>}
+                    </div>
                     </div>
                 </div>
                 {incident.description && <p className="text-slate-300 mb-4">{incident.description}</p>}

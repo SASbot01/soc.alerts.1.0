@@ -20,6 +20,7 @@ import type {
   ChatResponse,
   ChatSessionSummary,
   ChatHistoryResponse,
+  MitreCoverageItem,
 } from '../types';
 
 // ===== User Management =====
@@ -311,6 +312,12 @@ export const mitreService = {
 
   mapThreat: (threatId: string, techniqueId: string, confidence: number) =>
     api.post(`/mitre/threat/${threatId}/map`, { techniqueId, confidence }).then(r => r.data),
+
+  getCoverage: () =>
+    api.get<MitreCoverageItem[]>('/mitre/coverage').then(r => r.data),
+
+  getIncidentMappings: (incidentId: string) =>
+    api.get(`/mitre/incident/${incidentId}/mappings`).then(r => r.data),
 };
 
 // ===== Reports =====
@@ -344,6 +351,17 @@ export const reportService = {
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', 'incidents-export.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }),
+
+  downloadIncidentPDF: (incidentId: string) =>
+    api.get(`/reports/incident/${incidentId}`, { responseType: 'blob' }).then(r => {
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `incident-report-${incidentId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();

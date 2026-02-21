@@ -7,6 +7,8 @@ import com.blackwolf.backend.model.ThreatMitreMapping;
 import com.blackwolf.backend.repository.MitreTechniqueRepository;
 import com.blackwolf.backend.repository.ThreatEventRepository;
 import com.blackwolf.backend.repository.ThreatMitreMappingRepository;
+import com.blackwolf.backend.model.Incident;
+import com.blackwolf.backend.repository.IncidentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,9 @@ public class MitreService {
 
     @Autowired
     private ThreatEventRepository threatEventRepository;
+
+    @Autowired
+    private IncidentRepository incidentRepository;
 
     public List<MitreTechnique> listAll() {
         return mitreTechniqueRepository.findAll();
@@ -129,5 +134,47 @@ public class MitreService {
         }
 
         return results;
+    }
+
+    public List<MitreCoverageResponse> getCoverage(String companyId) {
+        List<ThreatMitreMapping> mappings = threatMitreMappingRepository.findByCompanyId(companyId);
+
+        // Group by techniqueId
+        Map<String, List<ThreatMitreMapping>> byTechnique = mappings.stream()
+                .collect(Collectors.groupingBy(ThreatMitreMapping::getTechniqueId));
+
+        List<MitreCoverageResponse> result = new ArrayList<>();
+        for (Map.Entry<String, List<ThreatMitreMapping>> entry : byTechnique.entrySet()) {
+            String techId = entry.getKey();
+            List<ThreatMitreMapping> techMappings = entry.getValue();
+
+            MitreCoverageResponse cov = new MitreCoverageResponse();
+            cov.setTechniqueId(techId);
+            cov.setHitCount(techMappings.size());
+            cov.setLastSeen(techMappings.stream()
+                    .map(ThreatMitreMapping::getMappedAt)
+                    .filter(Objects::nonNull)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null));
+
+            mitreTechniqueRepository.findById(techId).ifPresent(t -> {
+                cov.setTechniqueName(t.getName());
+                cov.setTactic(t.getTactic());
+            });
+
+            result.add(cov);
+        }
+        return result;
+    }
+
+    public List<MitreMappingResponse> getMappingsForIncident(String incidentId) {
+        Incident incident = incidentRepository.findById(incidentId)
+                .orElseThrow(() -> new RuntimeException("Incident not found"));
+
+        if (incident.getSourceThreatId() == null) {
+            return Collections.emptyList();
+        }
+
+        return getMappingsForThreat(incident.getSourceThreatId());
     }
 }

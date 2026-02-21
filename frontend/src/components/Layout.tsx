@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, ShieldAlert, Radio, LogOut, Settings, Menu,
     ClipboardCheck, Crosshair, Bug, Award, Users, Building2,
-    AlertCircle, Bell, FileText, Zap, Server
+    AlertCircle, Bell, FileText, Zap, Server, Grid3X3
 } from 'lucide-react';
 import clsx from 'clsx';
 import AiChatWidget from './AiChatWidget';
@@ -35,6 +35,7 @@ const Layout: React.FC = () => {
     ];
 
     const socNavItems = [
+        { name: 'MITRE ATT&CK', path: '/mitre', icon: Grid3X3 },
         { name: 'Audits', path: '/audits', icon: ClipboardCheck },
         { name: 'Pentests', path: '/pentests', icon: Crosshair },
         { name: 'Vulnerabilities', path: '/vulnerabilities', icon: Bug },

@@ -24,4 +24,7 @@ public class CorrelationRule {
     private String incidentSeverity;
     private boolean isActive;
     private LocalDateTime createdAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String chainSequence;
 }

@@ -110,6 +110,18 @@ public class SseService {
         sendToCompany(companyId, "dashboard_update", Map.of("companyId", companyId));
     }
 
+    public void emitAiAgentLog(String companyId, String level, String action, String message) {
+        Map<String, Object> data = Map.of(
+                "level", level,
+                "action", action,
+                "message", message,
+                "timestamp", java.time.LocalDateTime.now().toString(),
+                "companyId", companyId
+        );
+        sendToCompany(companyId, "ai_agent_log", data);
+        sendToGlobal("ai_agent_log", data);
+    }
+
     private void sendToCompany(String companyId, String eventName, Object data) {
         CopyOnWriteArrayList<SseEmitter> emitters = companyEmitters.get(companyId);
         if (emitters == null || emitters.isEmpty()) return;

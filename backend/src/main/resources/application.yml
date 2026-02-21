@@ -16,6 +16,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     validate-on-migrate: false
+    placeholder-replacement: false
 
 minio:
   url: ${MINIO_URL:http://localhost:9000}
@@ -79,3 +80,18 @@ ai:
     model: ${CLAUDE_MODEL:claude-sonnet-4-20250514}
     max-tokens: ${CLAUDE_MAX_TOKENS:4096}
     enabled: ${CLAUDE_ENABLED:false}
+  agent:
+    enabled: ${AI_AGENT_ENABLED:false}
+    max-tokens: ${AI_AGENT_MAX_TOKENS:8192}
+    slack-webhook: ${AI_AGENT_SLACK_WEBHOOK:}
+    slack-enabled: ${AI_AGENT_SLACK_ENABLED:false}
+    cron: ${AI_AGENT_CRON:0 0 */6 * * *}
+    analysis-hours: ${AI_AGENT_ANALYSIS_HOURS:24}
+    autonomous:
+      enabled: ${AI_AUTONOMOUS_ENABLED:false}
+      max-tokens: ${AI_AUTONOMOUS_MAX_TOKENS:4096}
+      batch-interval-ms: ${AI_AUTONOMOUS_BATCH_INTERVAL_MS:120000}
+      critical-threshold: ${AI_AUTONOMOUS_CRITICAL_THRESHOLD:8}
+      auto-block: ${AI_AUTONOMOUS_AUTO_BLOCK:true}
+      auto-incident: ${AI_AUTONOMOUS_AUTO_INCIDENT:true}
+      noise-learning: ${AI_AUTONOMOUS_NOISE_LEARNING:true}

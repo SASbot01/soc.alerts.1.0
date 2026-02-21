@@ -56,6 +56,9 @@ public class SensorService {
     @Autowired
     private ActivityLogService activityLogService;
 
+    @Autowired
+    private AiAutonomousAgentService aiAutonomousAgentService;
+
     // ===== Upload Processing (unchanged) =====
 
     @Transactional
@@ -87,7 +90,33 @@ public class SensorService {
         // Process Threats
         List<ThreatInfo> threats = upload.getThreats();
         if (threats != null) {
+            // Dedup window: suppress duplicate alerts from same IP+type within 5 minutes
+            LocalDateTime dedupSince = LocalDateTime.now().minusMinutes(5);
+
             for (ThreatInfo t : threats) {
+                // Temporal deduplication: skip if we already have recent events from same IP+type
+                if (t.getSrc_ip() != null && t.getThreat_type() != null) {
+                    long recentCount = threatEventRepository.countRecentDuplicates(
+                            upload.getCompany_id(), t.getSrc_ip(), t.getThreat_type(), dedupSince);
+                    if (recentCount >= 3) {
+                        // Still save the event for historical record, but skip alerts/correlation
+                        ThreatEvent event = new ThreatEvent();
+                        event.setId(UUID.randomUUID().toString());
+                        event.setCompanyId(upload.getCompany_id());
+                        event.setSensorId(upload.getSensor_id());
+                        event.setThreatType(t.getThreat_type());
+                        event.setSeverity(t.getSeverity());
+                        event.setSrcIp(t.getSrc_ip());
+                        event.setDstIp(t.getDst_ip());
+                        event.setDstPort(t.getDst_port());
+                        event.setTimestamp(LocalDateTime.now());
+                        event.setStatus("suppressed");
+                        event.setDescription(t.getDescription());
+                        threatEventRepository.save(event);
+                        continue;
+                    }
+                }
+
                 ThreatEvent event = new ThreatEvent();
                 event.setId(UUID.randomUUID().toString());
                 event.setCompanyId(upload.getCompany_id());
@@ -116,8 +145,15 @@ public class SensorService {
                     // Don't fail the upload if enrichment/correlation/SSE/SOAR fails
                 }
 
-                // Auto Block logic
-                if (t.getSeverity() != null && t.getSeverity() >= 5) {
+                // Queue for autonomous AI analysis
+                try {
+                    aiAutonomousAgentService.queueThreat(event);
+                } catch (Exception e) {
+                    // Don't fail upload if AI agent has issues
+                }
+
+                // Auto Block logic (threshold raised to severity >= 7 to reduce false positives)
+                if (t.getSeverity() != null && t.getSeverity() >= 7) {
                     BlockedIPId id = new BlockedIPId();
                     id.setIp(t.getSrc_ip());
                     id.setCompanyId(upload.getCompany_id());

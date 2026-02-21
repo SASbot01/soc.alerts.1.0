@@ -4,6 +4,7 @@ import { ShieldAlert, Radio, Activity, Globe, ArrowUpRight, Download, FileText }
 import { reportService } from '../lib/services';
 import RiskScoreGauge from '../components/RiskScoreGauge';
 import ThreatMap from '../components/ThreatMap';
+import AiAgentConsole from '../components/AiAgentConsole';
 import { useSseEvents } from '../hooks/useSseEvents';
 import { useAuth } from '../context/AuthContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -95,6 +96,9 @@ const Dashboard: React.FC = () => {
 
             {/* Threat Map */}
             <ThreatMap refreshTrigger={mapRefresh} />
+
+            {/* AI Agent Console */}
+            <AiAgentConsole />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart */}

@@ -1,9 +1,17 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 export interface SseEvent {
-    type: 'threat' | 'incident' | 'alert' | 'dashboard_update';
+    type: 'threat' | 'incident' | 'alert' | 'dashboard_update' | 'ai_agent_log';
     data: Record<string, unknown>;
     timestamp: Date;
+}
+
+export interface AiAgentLogEvent {
+    level: string;
+    action: string;
+    message: string;
+    timestamp: string;
+    companyId: string;
 }
 
 interface UseSseEventsOptions {
@@ -12,6 +20,7 @@ interface UseSseEventsOptions {
     onIncident?: (data: Record<string, unknown>) => void;
     onAlert?: (data: Record<string, unknown>) => void;
     onDashboardUpdate?: () => void;
+    onAiAgentLog?: (data: AiAgentLogEvent) => void;
 }
 
 export function useSseEvents({
@@ -20,6 +29,7 @@ export function useSseEvents({
     onIncident,
     onAlert,
     onDashboardUpdate,
+    onAiAgentLog,
 }: UseSseEventsOptions) {
     const eventSourceRef = useRef<EventSource | null>(null);
     const [connected, setConnected] = useState(false);
@@ -75,13 +85,21 @@ export function useSseEvents({
             onDashboardUpdate?.();
         });
 
+        es.addEventListener('ai_agent_log', (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                addEvent('ai_agent_log', data);
+                onAiAgentLog?.(data as AiAgentLogEvent);
+            } catch { /* ignore */ }
+        });
+
         es.onerror = () => {
             setConnected(false);
             es.close();
             // Reconnect after 5 seconds
             reconnectTimeoutRef.current = setTimeout(connect, 5000);
         };
-    }, [companyId, onThreat, onIncident, onAlert, onDashboardUpdate, addEvent]);
+    }, [companyId, onThreat, onIncident, onAlert, onDashboardUpdate, onAiAgentLog, addEvent]);
 
     useEffect(() => {
         connect();

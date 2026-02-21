@@ -23,6 +23,7 @@ import Companies from './pages/Companies';
 import CompanyDetail from './pages/CompanyDetail';
 import Playbooks from './pages/Playbooks';
 import Assets from './pages/Assets';
+import MitreMatrix from './pages/MitreMatrix';
 import Layout from './components/Layout';
 import NotificationToast from './components/NotificationToast';
 import { useAuth } from './context/AuthContext';
@@ -64,6 +65,7 @@ const App: React.FC = () => {
         <Route path="certifications" element={<Certifications />} />
         <Route path="playbooks" element={<Playbooks />} />
         <Route path="assets" element={<Assets />} />
+        <Route path="mitre" element={<MitreMatrix />} />
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<Users />} />
         <Route path="superadmin/companies" element={<Companies />} />
