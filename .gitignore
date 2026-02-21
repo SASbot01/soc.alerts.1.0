@@ -34,5 +34,10 @@ deploy/.env
 # Logs
 *.log
 
+# Desktop client
+desktop/node_modules/
+desktop/build/
+desktop/icons/
+
 # Claude
 .claude/
