@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "BlackWolf SOC — Security Operations Center Desktop Client",
   "main": "main.js",
-  "author": "BlackWolf Security",
+  "homepage": "https://github.com/SASbot01/soc.alerts.1.0",
+  "author": {
+    "name": "BlackWolf Security",
+    "email": "security@blackwolfsec.io"
+  },
   "license": "MIT",
   "scripts": {
     "start": "electron .",
