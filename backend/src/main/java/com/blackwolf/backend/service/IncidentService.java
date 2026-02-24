@@ -108,9 +108,13 @@ public class IncidentService {
             }
         }
 
-        // Rule C: SLA deadline passed without escalation
+        // Rule C: SLA deadline passed without escalation — only for low/medium severity
+        // High and critical incidents created by the AI agent should NOT auto-resolve on SLA expiry
         if (incident.getSlaDeadline() != null && incident.getSlaDeadline().isBefore(LocalDateTime.now())) {
-            return "Auto-resolved: SLA deadline passed (" + incident.getSlaDeadline() + ") without escalation";
+            String sev = incident.getSeverity() != null ? incident.getSeverity().toLowerCase() : "low";
+            if ("low".equals(sev)) {
+                return "Auto-resolved: SLA deadline passed (" + incident.getSlaDeadline() + ") without escalation";
+            }
         }
 
         return null;

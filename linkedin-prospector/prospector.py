@@ -37,7 +37,7 @@ class Prospector:
         total_leads = 0
 
         for title in config.TARGET_TITLES:
-            results = self.li.search_people(keyword_title=title.strip(), limit=15)
+            results = self.li.search_people(title=title.strip(), limit=15)
 
             for result in results:
                 public_id = result.get("public_id")
