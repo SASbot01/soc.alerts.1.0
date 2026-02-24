@@ -59,13 +59,30 @@ public class SensorService {
     @Autowired
     private AiAutonomousAgentService aiAutonomousAgentService;
 
+    @Autowired
+    private ApiKeyService apiKeyService;
+
+    @Autowired
+    private ThreatIndexService threatIndexService;
+
+    @Autowired
+    private SigmaRuleService sigmaRuleService;
+
+    @Autowired
+    private UebaService uebaService;
+
     // ===== Upload Processing (unchanged) =====
 
     @Transactional
     public SensorResponse processUpload(SensorDataUpload upload) {
-        Optional<Company> company = companyRepository.findByApiKey(upload.getApi_key());
-        if (company.isEmpty() || !company.get().getId().equals(upload.getCompany_id())) {
-            throw new RuntimeException("Invalid API key or company mismatch");
+        // Validate API key via api_keys table (SHA-256 hash lookup)
+        Optional<String> validatedCompanyId = apiKeyService.validateKey(upload.getApi_key());
+        if (validatedCompanyId.isEmpty() || !validatedCompanyId.get().equals(upload.getCompany_id())) {
+            // Fallback: check legacy companies.api_key for backward compatibility
+            Optional<Company> company = companyRepository.findByApiKey(upload.getApi_key());
+            if (company.isEmpty() || !company.get().getId().equals(upload.getCompany_id())) {
+                throw new RuntimeException("Invalid API key or company mismatch");
+            }
         }
 
         // Update Sensor
@@ -145,6 +162,27 @@ public class SensorService {
                     // Don't fail the upload if enrichment/correlation/SSE/SOAR fails
                 }
 
+                // Index in Elasticsearch for fast search
+                try {
+                    threatIndexService.indexThreatEvent(event);
+                } catch (Exception e) {
+                    // Don't fail upload if ES indexing fails
+                }
+
+                // Evaluate SIGMA rules
+                try {
+                    sigmaRuleService.evaluateEvent(event);
+                } catch (Exception e) {
+                    // Don't fail upload if SIGMA evaluation fails
+                }
+
+                // UEBA behavioral analysis
+                try {
+                    uebaService.evaluateEvent(event);
+                } catch (Exception e) {
+                    // Don't fail upload if UEBA fails
+                }
+
                 // Queue for autonomous AI analysis
                 try {
                     aiAutonomousAgentService.queueThreat(event);
@@ -159,20 +197,24 @@ public class SensorService {
                     id.setCompanyId(upload.getCompany_id());
 
                     if (!blockedIPRepository.existsById(id)) {
-                        BlockedIP blocked = new BlockedIP();
-                        blocked.setIp(t.getSrc_ip());
-                        blocked.setCompanyId(upload.getCompany_id());
-                        blocked.setReason("Auto-block: " + t.getThreat_type());
-                        blocked.setBlockedAt(LocalDateTime.now());
-                        blocked.setExpiresAt(LocalDateTime.now().plusHours(24));
-                        blockedIPRepository.save(blocked);
+                        try {
+                            BlockedIP blocked = new BlockedIP();
+                            blocked.setIp(t.getSrc_ip());
+                            blocked.setCompanyId(upload.getCompany_id());
+                            blocked.setReason("Auto-block: " + t.getThreat_type());
+                            blocked.setBlockedAt(LocalDateTime.now());
+                            blocked.setExpiresAt(LocalDateTime.now().plusHours(24));
+                            blockedIPRepository.save(blocked);
+                        } catch (org.springframework.dao.DataIntegrityViolationException ignored) {
+                            // IP already blocked by concurrent thread
+                        }
                     }
                 }
             }
         }
 
-        // Get Commands (Blocked IPs)
-        List<BlockedIP> blockedIPs = blockedIPRepository.findByCompanyId(upload.getCompany_id());
+        // Get Commands (Blocked IPs - only active, non-expired)
+        List<BlockedIP> blockedIPs = blockedIPRepository.findActiveByCompanyId(upload.getCompany_id(), LocalDateTime.now());
         List<Command> commands = blockedIPs.stream()
                 .map(b -> new Command("block_ip", b.getIp(), b.getReason()))
                 .collect(Collectors.toList());

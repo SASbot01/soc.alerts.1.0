@@ -10,6 +10,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -26,6 +27,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -72,13 +74,23 @@ public class SecurityConfig {
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
+                                "/api/v1/auth/mfa-verify",
                                 "/api/v1/sensors/upload",
                                 "/api/v1/onboarding/submit",
                                 "/api/v1/sse/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
-                                "/actuator/health"
+                                "/actuator/health",
+                                "/api/v1/soc-info/**",
+                                "/api/v1/billing/webhook",
+                                "/api/v1/sso/check",
+                                "/api/v1/sso/authorize",
+                                "/api/v1/sso/callback",
+                                "/api/v1/prospects/track/**",
+                                "/api/v1/prospects/unsubscribe",
+                                "/api/v1/onboarding/submit-and-checkout",
+                                "/api/v1/prospects/from-bot"
                         ).permitAll()
                         .anyRequest().authenticated());
 

@@ -5,10 +5,12 @@ import com.blackwolf.backend.repository.LoginAttemptRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -22,40 +24,58 @@ public class RateLimitService {
     private static final int REGISTER_WINDOW_MINUTES = 60;
     private static final int MAX_IP_ATTEMPTS = 20;
     private static final int IP_WINDOW_MINUTES = 15;
+    private static final int MAX_API_REQUESTS = 100;
+    private static final int API_WINDOW_MINUTES = 1;
+
+    private static final String REDIS_PREFIX = "rate:";
 
     @Autowired
     private LoginAttemptRepository loginAttemptRepository;
 
-    public void checkRateLimit(String identifier, String ipAddress, LoginAttempt.AttemptType type) {
-        LocalDateTime window;
-        int maxAttempts;
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
 
-        switch (type) {
-            case LOGIN -> {
-                window = LocalDateTime.now().minusMinutes(LOGIN_WINDOW_MINUTES);
-                maxAttempts = MAX_LOGIN_ATTEMPTS;
-            }
-            case REGISTER -> {
-                window = LocalDateTime.now().minusMinutes(REGISTER_WINDOW_MINUTES);
-                maxAttempts = MAX_REGISTER_ATTEMPTS;
-            }
-            default -> {
-                window = LocalDateTime.now().minusMinutes(IP_WINDOW_MINUTES);
-                maxAttempts = MAX_IP_ATTEMPTS;
+    public void checkRateLimit(String identifier, String ipAddress, LoginAttempt.AttemptType type) {
+        int maxAttempts = getMaxAttempts(type);
+        int windowMinutes = getWindowMinutes(type);
+
+        // Try Redis first (fast path)
+        if (redisTemplate != null) {
+            try {
+                String key = REDIS_PREFIX + type.name().toLowerCase() + ":" + identifier;
+                if (!checkRedisRate(key, maxAttempts, Duration.ofMinutes(windowMinutes))) {
+                    log.warn("Rate limit exceeded (Redis) for identifier: {} type: {}", identifier, type);
+                    throw new RateLimitExceededException(
+                            "Too many attempts. Try again in " + windowMinutes + " minutes.");
+                }
+                if (ipAddress != null) {
+                    String ipKey = REDIS_PREFIX + "ip:" + type.name().toLowerCase() + ":" + ipAddress;
+                    if (!checkRedisRate(ipKey, MAX_IP_ATTEMPTS, Duration.ofMinutes(IP_WINDOW_MINUTES))) {
+                        log.warn("Rate limit exceeded (Redis) for IP: {} type: {}", ipAddress, type);
+                        throw new RateLimitExceededException(
+                                "Too many attempts from this IP. Try again later.");
+                    }
+                }
+                return;
+            } catch (RateLimitExceededException e) {
+                throw e;
+            } catch (Exception e) {
+                log.warn("Redis rate limit check failed, falling back to DB: {}", e.getMessage());
             }
         }
 
-        // Check by identifier (email/domain combo)
+        // Fallback to MySQL
+        LocalDateTime window = LocalDateTime.now().minusMinutes(windowMinutes);
+
         long identifierAttempts = loginAttemptRepository
                 .countByIdentifierAndAttemptTypeAndSuccessFalseAndAttemptedAtAfter(identifier, type, window);
 
         if (identifierAttempts >= maxAttempts) {
             log.warn("Rate limit exceeded for identifier: {} type: {}", identifier, type);
             throw new RateLimitExceededException(
-                    "Too many attempts. Try again in " + getWindowMinutes(type) + " minutes.");
+                    "Too many attempts. Try again in " + windowMinutes + " minutes.");
         }
 
-        // Check by IP
         if (ipAddress != null) {
             long ipAttempts = loginAttemptRepository
                     .countByIpAddressAndAttemptTypeAndSuccessFalseAndAttemptedAtAfter(ipAddress, type, window);
@@ -68,6 +88,7 @@ public class RateLimitService {
     }
 
     public void recordAttempt(String identifier, String ipAddress, LoginAttempt.AttemptType type, boolean success) {
+        // Always persist to MySQL for audit trail
         LoginAttempt attempt = new LoginAttempt();
         attempt.setIdentifier(identifier);
         attempt.setIpAddress(ipAddress);
@@ -75,6 +96,46 @@ public class RateLimitService {
         attempt.setSuccess(success);
         attempt.setAttemptedAt(LocalDateTime.now());
         loginAttemptRepository.save(attempt);
+
+        // Reset Redis counter on success
+        if (success && redisTemplate != null) {
+            try {
+                String key = REDIS_PREFIX + type.name().toLowerCase() + ":" + identifier;
+                redisTemplate.delete(key);
+            } catch (Exception e) {
+                log.warn("Failed to reset Redis rate limit counter: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Check API rate limit (Redis only, no MySQL audit).
+     */
+    public boolean checkApiRate(String apiKeyPrefix) {
+        if (redisTemplate == null) return true;
+        try {
+            String key = REDIS_PREFIX + "api:" + apiKeyPrefix;
+            return checkRedisRate(key, MAX_API_REQUESTS, Duration.ofMinutes(API_WINDOW_MINUTES));
+        } catch (Exception e) {
+            log.warn("Redis API rate check failed, allowing: {}", e.getMessage());
+            return true;
+        }
+    }
+
+    private boolean checkRedisRate(String key, int maxAttempts, Duration window) {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            redisTemplate.expire(key, window);
+        }
+        return count != null && count <= maxAttempts;
+    }
+
+    private int getMaxAttempts(LoginAttempt.AttemptType type) {
+        return switch (type) {
+            case LOGIN -> MAX_LOGIN_ATTEMPTS;
+            case REGISTER -> MAX_REGISTER_ATTEMPTS;
+            default -> MAX_IP_ATTEMPTS;
+        };
     }
 
     private int getWindowMinutes(LoginAttempt.AttemptType type) {

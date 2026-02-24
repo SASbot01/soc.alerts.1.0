@@ -17,10 +17,11 @@ interface DataTableProps<T> {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   onRowClick?: (item: T) => void;
+  renderExpandedRow?: (item: T) => React.ReactNode | null;
   keyExtractor: (item: T) => string;
 }
 
-function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, onRowClick, keyExtractor }: DataTableProps<T>) {
+function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, onRowClick, renderExpandedRow, keyExtractor }: DataTableProps<T>) {
   if (loading) {
     return (
       <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] overflow-hidden backdrop-blur-sm">
@@ -51,19 +52,30 @@ function DataTable<T>({ columns, data, loading, page, totalPages, onPageChange, 
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/30">
-            {data.map(item => (
-              <tr
-                key={keyExtractor(item)}
-                className={clsx('hover:bg-slate-800/30 transition-colors', onRowClick && 'cursor-pointer')}
-                onClick={() => onRowClick?.(item)}
-              >
-                {columns.map(col => (
-                  <td key={col.key} className={clsx('p-4', col.className)}>
-                    {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as React.ReactNode}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {data.map(item => {
+              const expanded = renderExpandedRow?.(item);
+              return (
+                <React.Fragment key={keyExtractor(item)}>
+                  <tr
+                    className={clsx('hover:bg-slate-800/30 transition-colors', onRowClick && 'cursor-pointer')}
+                    onClick={() => onRowClick?.(item)}
+                  >
+                    {columns.map(col => (
+                      <td key={col.key} className={clsx('p-4', col.className)}>
+                        {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as React.ReactNode}
+                      </td>
+                    ))}
+                  </tr>
+                  {expanded && (
+                    <tr>
+                      <td colSpan={columns.length} className="p-4 bg-slate-900/30">
+                        {expanded}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

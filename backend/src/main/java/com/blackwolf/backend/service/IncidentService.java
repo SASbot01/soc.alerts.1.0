@@ -1,11 +1,13 @@
 package com.blackwolf.backend.service;
 
 import com.blackwolf.backend.dto.IncidentDTOs.*;
-import com.blackwolf.backend.model.Incident;
-import com.blackwolf.backend.model.IncidentTimeline;
-import com.blackwolf.backend.repository.IncidentRepository;
-import com.blackwolf.backend.repository.IncidentTimelineRepository;
+import com.blackwolf.backend.model.*;
+import com.blackwolf.backend.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,8 @@ import java.util.UUID;
 @Service
 public class IncidentService {
 
+    private static final Logger log = LoggerFactory.getLogger(IncidentService.class);
+
     @Autowired
     private IncidentRepository incidentRepository;
 
@@ -24,6 +28,93 @@ public class IncidentService {
 
     @Autowired
     private SseService sseService;
+
+    @Autowired
+    private AiDecisionRepository aiDecisionRepository;
+
+    @Autowired
+    private ThreatEventRepository threatEventRepository;
+
+    @Autowired
+    private BlockedIPRepository blockedIPRepository;
+
+    @Autowired
+    private CompanyRepository companyRepository;
+
+    @Value("${incident.auto-resolve.enabled:true}")
+    private boolean autoResolveEnabled;
+
+    // ===== AUTO-RESOLVE STALE INCIDENTS =====
+
+    @Scheduled(fixedDelayString = "${incident.auto-resolve.interval-ms:600000}")
+    @Transactional
+    public void autoResolveStale() {
+        if (!autoResolveEnabled) return;
+
+        try {
+            List<Company> companies = companyRepository.findAll();
+            int totalResolved = 0;
+
+            for (Company company : companies) {
+                List<Incident> openIncidents = incidentRepository.findByCompanyIdAndStatus(company.getId(), "open");
+
+                for (Incident incident : openIncidents) {
+                    String reason = checkAutoResolveReason(incident);
+                    if (reason != null) {
+                        incident.setStatus("resolved");
+                        incident.setResolvedAt(LocalDateTime.now());
+                        incident.setUpdatedAt(LocalDateTime.now());
+                        incidentRepository.save(incident);
+
+                        addTimelineEntry(incident.getId(), "Auto-Resolved", reason, "ai-agent");
+                        totalResolved++;
+                    }
+                }
+            }
+
+            if (totalResolved > 0) {
+                log.info("Auto-resolve: Resolved {} stale incidents", totalResolved);
+            }
+        } catch (Exception e) {
+            log.error("Auto-resolve: Failed: {}", e.getMessage());
+        }
+    }
+
+    private String checkAutoResolveReason(Incident incident) {
+        // Rule A: Source threat was classified NOISE or FALSE_POSITIVE by AI
+        if (incident.getSourceThreatId() != null) {
+            List<AiDecision> decisions = aiDecisionRepository.findByThreatEventId(incident.getSourceThreatId());
+            for (AiDecision d : decisions) {
+                if (d.getVerdict() == AiDecision.Verdict.NOISE || d.getVerdict() == AiDecision.Verdict.FALSE_POSITIVE) {
+                    return "Auto-resolved: Source threat classified as " + d.getVerdict() + " by AI agent (confidence: "
+                            + d.getConfidence() + ")";
+                }
+            }
+        }
+
+        // Rule B: Associated blocked IP has expired
+        if (incident.getSourceThreatId() != null) {
+            var threatOpt = threatEventRepository.findById(incident.getSourceThreatId());
+            if (threatOpt.isPresent() && threatOpt.get().getSrcIp() != null) {
+                String srcIp = threatOpt.get().getSrcIp();
+                BlockedIPId ipId = new BlockedIPId();
+                ipId.setIp(srcIp);
+                ipId.setCompanyId(incident.getCompanyId());
+                var blockedOpt = blockedIPRepository.findById(ipId);
+                if (blockedOpt.isPresent() && blockedOpt.get().getExpiresAt() != null
+                        && blockedOpt.get().getExpiresAt().isBefore(LocalDateTime.now())) {
+                    return "Auto-resolved: Blocked IP " + srcIp + " has expired (expired at " + blockedOpt.get().getExpiresAt() + ")";
+                }
+            }
+        }
+
+        // Rule C: SLA deadline passed without escalation
+        if (incident.getSlaDeadline() != null && incident.getSlaDeadline().isBefore(LocalDateTime.now())) {
+            return "Auto-resolved: SLA deadline passed (" + incident.getSlaDeadline() + ") without escalation";
+        }
+
+        return null;
+    }
 
     public List<Incident> listByCompany(String companyId) {
         return incidentRepository.findByCompanyId(companyId);

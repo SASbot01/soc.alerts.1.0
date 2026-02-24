@@ -32,4 +32,12 @@ public interface ThreatEventRepository extends JpaRepository<ThreatEvent, String
                                 @Param("srcIp") String srcIp,
                                 @Param("threatType") String threatType,
                                 @Param("since") LocalDateTime since);
+
+    @Query("SELECT t.srcIp, COUNT(DISTINCT t.companyId), COUNT(t) " +
+           "FROM ThreatEvent t WHERE t.timestamp >= :since AND t.srcIp IS NOT NULL " +
+           "GROUP BY t.srcIp HAVING COUNT(DISTINCT t.companyId) >= 2 " +
+           "ORDER BY COUNT(DISTINCT t.companyId) DESC")
+    List<Object[]> findCrossTenantAttackers(@Param("since") LocalDateTime since);
+
+    List<ThreatEvent> findByCompanyIdAndTimestampAfterOrderByTimestampDesc(String companyId, LocalDateTime since);
 }

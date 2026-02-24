@@ -135,10 +135,15 @@ const Assets: React.FC = () => {
     useEffect(() => { loadAssets(); }, [typeFilter]);
 
     const createAsset = async () => {
-        await api.post('/assets', form);
-        setShowCreate(false);
-        setForm({ name: '', assetType: 'SERVER', ipAddress: '', hostname: '', operatingSystem: '', criticality: 'MEDIUM', owner: '', location: '', notes: '' });
-        loadAssets();
+        try {
+            await api.post('/assets', form);
+            setShowCreate(false);
+            setForm({ name: '', assetType: 'SERVER', ipAddress: '', hostname: '', operatingSystem: '', criticality: 'MEDIUM', owner: '', location: '', notes: '' });
+            loadAssets();
+        } catch (error: any) {
+            const msg = error.response?.data?.message || error.response?.data?.reason || 'Failed to create asset';
+            alert(msg);
+        }
     };
 
     const toggleExpand = async (assetId: string) => {

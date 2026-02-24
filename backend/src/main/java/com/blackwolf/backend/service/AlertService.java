@@ -10,10 +10,11 @@ import com.blackwolf.backend.repository.AlertHistoryRepository;
 import com.blackwolf.backend.repository.CompanyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -38,6 +39,9 @@ public class AlertService {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private EmailTemplateService emailTemplateService;
 
     @Value("${alerts.from-email:soc@blackwolf.io}")
     private String fromEmail;
@@ -152,13 +156,20 @@ public class AlertService {
             log.warn("Mail sender not configured, skipping email to {}", to);
             return;
         }
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setFrom(fromEmail);
-        msg.setTo(to);
-        msg.setSubject(subject);
-        msg.setText(body);
-        mailSender.send(msg);
-        log.info("Email alert sent to {}", to);
+        try {
+            String htmlContent = emailTemplateService.renderAlertHtml(subject, body);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail, "BlackWolf SOC");
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+            log.info("Email alert sent to {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send HTML email to {}: {}", to, e.getMessage());
+            throw new RuntimeException("Email send failed", e);
+        }
     }
 
     private void sendSlack(String webhookUrl, String subject, String message) {

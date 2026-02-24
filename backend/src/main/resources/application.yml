@@ -30,14 +30,20 @@ jwt:
   refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
   cookie-secure: ${JWT_COOKIE_SECURE:false}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 5000
+
 spring.mail:
   host: ${MAIL_HOST:localhost}
   port: ${MAIL_PORT:587}
   username: ${MAIL_USERNAME:}
   password: ${MAIL_PASSWORD:}
   properties:
-    mail.smtp.auth: false
-    mail.smtp.starttls.enable: false
+    mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+    mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:80}
@@ -47,6 +53,18 @@ threatintel:
   abuseipdb:
     api-key: ${ABUSEIPDB_API_KEY:}
     enabled: ${ABUSEIPDB_ENABLED:false}
+  virustotal:
+    api-key: ${VIRUSTOTAL_API_KEY:}
+    enabled: ${VIRUSTOTAL_ENABLED:false}
+  greynoise:
+    api-key: ${GREYNOISE_API_KEY:}
+    enabled: ${GREYNOISE_ENABLED:false}
+  shodan:
+    api-key: ${SHODAN_API_KEY:}
+    enabled: ${SHODAN_ENABLED:false}
+  otx:
+    api-key: ${OTX_API_KEY:}
+    enabled: ${OTX_ENABLED:false}
 
 # Alert defaults
 alerts:
@@ -79,19 +97,54 @@ ai:
     api-key: ${CLAUDE_API_KEY:}
     model: ${CLAUDE_MODEL:claude-sonnet-4-20250514}
     max-tokens: ${CLAUDE_MAX_TOKENS:4096}
-    enabled: ${CLAUDE_ENABLED:false}
+    enabled: ${CLAUDE_ENABLED:true}
   agent:
-    enabled: ${AI_AGENT_ENABLED:false}
+    enabled: ${AI_AGENT_ENABLED:true}
     max-tokens: ${AI_AGENT_MAX_TOKENS:8192}
     slack-webhook: ${AI_AGENT_SLACK_WEBHOOK:}
-    slack-enabled: ${AI_AGENT_SLACK_ENABLED:false}
+    slack-enabled: ${AI_AGENT_SLACK_ENABLED:true}
     cron: ${AI_AGENT_CRON:0 0 */6 * * *}
     analysis-hours: ${AI_AGENT_ANALYSIS_HOURS:24}
     autonomous:
-      enabled: ${AI_AUTONOMOUS_ENABLED:false}
+      enabled: ${AI_AUTONOMOUS_ENABLED:true}
       max-tokens: ${AI_AUTONOMOUS_MAX_TOKENS:4096}
       batch-interval-ms: ${AI_AUTONOMOUS_BATCH_INTERVAL_MS:120000}
       critical-threshold: ${AI_AUTONOMOUS_CRITICAL_THRESHOLD:8}
       auto-block: ${AI_AUTONOMOUS_AUTO_BLOCK:true}
       auto-incident: ${AI_AUTONOMOUS_AUTO_INCIDENT:true}
       noise-learning: ${AI_AUTONOMOUS_NOISE_LEARNING:true}
+
+# Incident auto-resolve
+incident:
+  auto-resolve:
+    enabled: ${INCIDENT_AUTO_RESOLVE_ENABLED:true}
+    interval-ms: ${INCIDENT_AUTO_RESOLVE_INTERVAL_MS:600000}
+
+# Stripe Billing
+stripe:
+  api-key: ${STRIPE_API_KEY:}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  prices:
+    starter: ${STRIPE_PRICE_STARTER:}
+    professional: ${STRIPE_PRICE_PROFESSIONAL:}
+    enterprise: ${STRIPE_PRICE_ENTERPRISE:}
+
+# App
+app:
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+
+# Elasticsearch
+spring.elasticsearch:
+  uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  connection-timeout: 5s
+  socket-timeout: 30s
+
+# LinkedIn Prospector Bot
+prospector:
+  api-key: ${PROSPECTOR_API_KEY:}
+
+# Maintenance tasks
+maintenance:
+  cleanup-expired-ips:
+    enabled: ${MAINTENANCE_CLEANUP_ENABLED:true}
+    interval-ms: ${MAINTENANCE_CLEANUP_INTERVAL_MS:3600000}

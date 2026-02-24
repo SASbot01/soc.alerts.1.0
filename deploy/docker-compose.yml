@@ -33,6 +33,42 @@ services:
     networks:
       - blackwolf-net
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - blackwolf-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - blackwolf-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
   backend:
     build:
       context: ../backend
@@ -55,25 +91,46 @@ services:
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
       CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-4096}
       CLAUDE_ENABLED: ${CLAUDE_ENABLED:-true}
-      AI_AGENT_ENABLED: ${AI_AGENT_ENABLED:-false}
+      AI_AGENT_ENABLED: ${AI_AGENT_ENABLED:-true}
       AI_AGENT_MAX_TOKENS: ${AI_AGENT_MAX_TOKENS:-8192}
       AI_AGENT_SLACK_WEBHOOK: ${AI_AGENT_SLACK_WEBHOOK:-}
-      AI_AGENT_SLACK_ENABLED: ${AI_AGENT_SLACK_ENABLED:-false}
+      AI_AGENT_SLACK_ENABLED: ${AI_AGENT_SLACK_ENABLED:-true}
       AI_AGENT_CRON: ${AI_AGENT_CRON:-0 0 */6 * * *}
       AI_AGENT_ANALYSIS_HOURS: ${AI_AGENT_ANALYSIS_HOURS:-24}
-      AI_AUTONOMOUS_ENABLED: ${AI_AUTONOMOUS_ENABLED:-false}
+      AI_AUTONOMOUS_ENABLED: ${AI_AUTONOMOUS_ENABLED:-true}
       AI_AUTONOMOUS_MAX_TOKENS: ${AI_AUTONOMOUS_MAX_TOKENS:-4096}
       AI_AUTONOMOUS_BATCH_INTERVAL_MS: ${AI_AUTONOMOUS_BATCH_INTERVAL_MS:-120000}
       AI_AUTONOMOUS_CRITICAL_THRESHOLD: ${AI_AUTONOMOUS_CRITICAL_THRESHOLD:-8}
       AI_AUTONOMOUS_AUTO_BLOCK: ${AI_AUTONOMOUS_AUTO_BLOCK:-true}
       AI_AUTONOMOUS_AUTO_INCIDENT: ${AI_AUTONOMOUS_AUTO_INCIDENT:-true}
       AI_AUTONOMOUS_NOISE_LEARNING: ${AI_AUTONOMOUS_NOISE_LEARNING:-true}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PROFESSIONAL: ${STRIPE_PRICE_PROFESSIONAL:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-false}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-false}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-soc@blackwolf.io}
+      APP_BASE_URL: ${APP_BASE_URL:-https://soc.blackwolfsec.io}
+      PROSPECTOR_API_KEY: ${PROSPECTOR_API_KEY:-}
       CORS_ALLOWED_ORIGINS: https://soc.blackwolfsec.io,http://soc.blackwolfsec.io,http://localhost:5173,http://localhost:80
     depends_on:
       mysql:
         condition: service_healthy
       minio:
         condition: service_started
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     networks:
       - blackwolf-net
 
@@ -215,6 +272,29 @@ services:
     networks:
       - blackwolf-net
 
+  linkedin-prospector:
+    build:
+      context: ../linkedin-prospector
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      LINKEDIN_EMAIL: ${LINKEDIN_EMAIL:-}
+      LINKEDIN_PASSWORD: ${LINKEDIN_PASSWORD:-}
+      BACKEND_URL: http://backend:8080/api/v1
+      PROSPECTOR_API_KEY: ${PROSPECTOR_API_KEY:-}
+      MAX_CONNECTIONS_PER_DAY: ${PROSPECTOR_MAX_CONNECTIONS:-20}
+      MAX_CONNECTIONS_WEEKEND: ${PROSPECTOR_MAX_CONNECTIONS_WEEKEND:-5}
+      MAX_MESSAGES_PER_DAY: ${PROSPECTOR_MAX_MESSAGES:-15}
+      MIN_DELAY_SECONDS: ${PROSPECTOR_MIN_DELAY:-180}
+      MAX_DELAY_SECONDS: ${PROSPECTOR_MAX_DELAY:-420}
+      WORK_HOUR_START: ${PROSPECTOR_WORK_START:-9}
+      WORK_HOUR_END: ${PROSPECTOR_WORK_END:-18}
+      GOOGLE_SEARCH_ENABLED: ${PROSPECTOR_GOOGLE_ENABLED:-true}
+      SMTP_VERIFY_ENABLED: ${PROSPECTOR_SMTP_VERIFY:-true}
+    networks:
+      - blackwolf-net
+
 networks:
   blackwolf-net:
     driver: bridge
@@ -222,5 +302,7 @@ networks:
 volumes:
   mysql_data:
   minio_data:
+  redis_data:
+  es_data:
   suricata_logs:
   nginx_logs:

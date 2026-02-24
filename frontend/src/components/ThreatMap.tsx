@@ -73,6 +73,50 @@ function geoToSvg(lat: number, lon: number): { x: number; y: number } {
     };
 }
 
+/**
+ * Spread overlapping points so co-located IPs are all visible.
+ * Points within OVERLAP_DIST px of each other get arranged in a circle.
+ */
+const OVERLAP_DIST = 12;
+const SPREAD_RADIUS = 14;
+
+function spreadOverlapping(pts: ThreatPoint[]): ThreatPoint[] {
+    if (pts.length === 0) return pts;
+
+    const used = new Array(pts.length).fill(false);
+    const groups: number[][] = [];
+
+    for (let i = 0; i < pts.length; i++) {
+        if (used[i]) continue;
+        const group = [i];
+        used[i] = true;
+        for (let j = i + 1; j < pts.length; j++) {
+            if (used[j]) continue;
+            const dx = pts[i].x - pts[j].x;
+            const dy = pts[i].y - pts[j].y;
+            if (Math.sqrt(dx * dx + dy * dy) < OVERLAP_DIST) {
+                group.push(j);
+                used[j] = true;
+            }
+        }
+        groups.push(group);
+    }
+
+    const result = [...pts.map(p => ({ ...p }))];
+    for (const group of groups) {
+        if (group.length < 2) continue;
+        const cx = group.reduce((s, i) => s + pts[i].x, 0) / group.length;
+        const cy = group.reduce((s, i) => s + pts[i].y, 0) / group.length;
+        const r = SPREAD_RADIUS * Math.min(group.length / 2, 2.5);
+        group.forEach((idx, k) => {
+            const angle = (2 * Math.PI * k) / group.length - Math.PI / 2;
+            result[idx].x = cx + r * Math.cos(angle);
+            result[idx].y = cy + r * Math.sin(angle);
+        });
+    }
+    return result;
+}
+
 /* Server location (Spain) */
 const SERVER_LOC = geoToSvg(40.42, -3.70);
 
@@ -227,7 +271,7 @@ const ThreatMap: React.FC<ThreatMapProps> = ({ refreshTrigger = 0 }) => {
                         totalReports: o.totalReports,
                     });
                 }
-                setPoints(result);
+                setPoints(spreadOverlapping(result));
             } catch (err) {
                 console.error('ThreatMap fetch error:', err);
             } finally {

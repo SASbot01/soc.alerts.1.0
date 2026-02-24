@@ -1,0 +1,7 @@
+linkedin-api==2.2.0
+fastapi==0.115.0
+uvicorn==0.30.6
+requests==2.32.3
+apscheduler==3.10.4
+beautifulsoup4==4.12.3
+dnspython==2.7.0

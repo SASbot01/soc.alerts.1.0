@@ -2,6 +2,7 @@ package com.blackwolf.backend.service;
 
 import com.blackwolf.backend.model.ThreatEnrichment;
 import com.blackwolf.backend.repository.ThreatEnrichmentRepository;
+import com.blackwolf.backend.service.threatintel.ThreatIntelProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,8 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ThreatIntelService {
@@ -21,6 +24,9 @@ public class ThreatIntelService {
 
     @Autowired
     private ThreatEnrichmentRepository enrichmentRepository;
+
+    @Autowired
+    private List<ThreatIntelProvider> providers;
 
     @Value("${threatintel.abuseipdb.api-key:}")
     private String abuseIpDbApiKey;
@@ -50,20 +56,39 @@ public class ThreatIntelService {
             local.setAbuseConfidenceScore(0);
             local.setTotalReports(0);
             local.setEnrichedAt(LocalDateTime.now());
+            local.setEnrichmentSources("local");
             return enrichmentRepository.save(local);
         }
 
+        // Start with AbuseIPDB (primary source)
+        ThreatEnrichment enrichment;
+        List<String> sources = new java.util.ArrayList<>();
+
         if (abuseIpDbEnabled && abuseIpDbApiKey != null && !abuseIpDbApiKey.isBlank()) {
-            return enrichFromAbuseIpDb(ip);
+            enrichment = enrichFromAbuseIpDb(ip);
+            sources.add("abuseipdb");
+        } else {
+            enrichment = cached.orElse(new ThreatEnrichment());
+            enrichment.setIp(ip);
+            if (enrichment.getCountryCode() == null) enrichment.setCountryCode("UNKNOWN");
+            if (enrichment.getAbuseConfidenceScore() == null) enrichment.setAbuseConfidenceScore(0);
+            if (enrichment.getTotalReports() == null) enrichment.setTotalReports(0);
         }
 
-        // Fallback: basic enrichment without external API
-        ThreatEnrichment enrichment = cached.orElse(new ThreatEnrichment());
-        enrichment.setIp(ip);
+        // Run all enabled additional providers
+        for (ThreatIntelProvider provider : providers) {
+            if (provider.isEnabled()) {
+                try {
+                    provider.enrich(enrichment);
+                    sources.add(provider.getName());
+                } catch (Exception e) {
+                    log.warn("Provider {} failed for {}: {}", provider.getName(), ip, e.getMessage());
+                }
+            }
+        }
+
         enrichment.setEnrichedAt(LocalDateTime.now());
-        if (enrichment.getCountryCode() == null) enrichment.setCountryCode("UNKNOWN");
-        if (enrichment.getAbuseConfidenceScore() == null) enrichment.setAbuseConfidenceScore(0);
-        if (enrichment.getTotalReports() == null) enrichment.setTotalReports(0);
+        enrichment.setEnrichmentSources(String.join(",", sources));
         return enrichmentRepository.save(enrichment);
     }
 

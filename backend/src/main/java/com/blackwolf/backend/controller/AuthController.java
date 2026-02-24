@@ -41,7 +41,24 @@ public class AuthController {
         String ipAddress = getClientIp(request);
         AuthResponse authResponse = authService.login(loginRequest, ipAddress);
 
-        // Set httpOnly cookies
+        // Set httpOnly cookies (only if not MFA pending)
+        if (!authResponse.isRequiresMfa()) {
+            addAccessTokenCookie(response, authResponse.getAccessToken());
+            addRefreshTokenCookie(response, authResponse.getRefreshToken());
+        }
+
+        return ResponseEntity.ok(authResponse);
+    }
+
+    @PostMapping("/mfa-verify")
+    public ResponseEntity<AuthResponse> mfaVerify(
+            @RequestBody MfaLoginRequest mfaLoginRequest,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        String ipAddress = getClientIp(request);
+        AuthResponse authResponse = authService.verifyMfa(mfaLoginRequest, ipAddress);
+
         addAccessTokenCookie(response, authResponse.getAccessToken());
         addRefreshTokenCookie(response, authResponse.getRefreshToken());
 

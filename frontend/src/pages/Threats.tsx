@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { AlertTriangle, AlertOctagon, Info } from 'lucide-react';
-import { threatService } from '../lib/services';
+import { AlertTriangle, AlertOctagon, Info, Eye, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { threatService, threatIntelService } from '../lib/services';
 import type { ThreatEvent, ThreatListResponse } from '../types';
 import DataTable, { type Column } from '../components/DataTable';
 import FilterBar, { type FilterConfig } from '../components/FilterBar';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import ThreatEnrichmentPanel from '../components/ThreatEnrichmentPanel';
 
 const Threats: React.FC = () => {
     const [data, setData] = useState<ThreatListResponse | null>(null);
@@ -13,6 +14,9 @@ const Threats: React.FC = () => {
     const [page, setPage] = useState(0);
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [search, setSearch] = useState('');
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [enrichmentData, setEnrichmentData] = useState<Record<string, unknown>>({});
+    const [enrichmentLoading, setEnrichmentLoading] = useState<Record<string, boolean>>({});
 
     const fetchThreats = useCallback(async () => {
         setLoading(true);
@@ -31,6 +35,38 @@ const Threats: React.FC = () => {
     }, [page, filters, search]);
 
     useEffect(() => { fetchThreats(); }, [fetchThreats]);
+
+    const handleExpand = async (threat: ThreatEvent) => {
+        if (expandedId === threat.id) {
+            setExpandedId(null);
+            return;
+        }
+        setExpandedId(threat.id);
+        const ip = threat.srcIp;
+        if (!enrichmentData[ip]) {
+            setEnrichmentLoading(prev => ({ ...prev, [ip]: true }));
+            try {
+                const result = await threatIntelService.getEnrichment(ip);
+                setEnrichmentData(prev => ({ ...prev, [ip]: result }));
+            } catch {
+                // No enrichment data yet
+            } finally {
+                setEnrichmentLoading(prev => ({ ...prev, [ip]: false }));
+            }
+        }
+    };
+
+    const handleEnrich = async (ip: string) => {
+        setEnrichmentLoading(prev => ({ ...prev, [ip]: true }));
+        try {
+            const result = await threatIntelService.enrichIp(ip);
+            setEnrichmentData(prev => ({ ...prev, [ip]: result }));
+        } catch (err) {
+            console.error('Enrichment failed:', err);
+        } finally {
+            setEnrichmentLoading(prev => ({ ...prev, [ip]: false }));
+        }
+    };
 
     const filterConfigs: FilterConfig[] = [
         {
@@ -58,6 +94,14 @@ const Threats: React.FC = () => {
     };
 
     const columns: Column<ThreatEvent>[] = [
+        {
+            key: 'expand', header: '',
+            render: (t) => (
+                <button onClick={(e) => { e.stopPropagation(); handleExpand(t); }} className="text-slate-500 hover:text-white transition-colors">
+                    {expandedId === t.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+            )
+        },
         {
             key: 'threatType', header: 'Type',
             render: (t) => (
@@ -89,6 +133,18 @@ const Threats: React.FC = () => {
             key: 'timestamp', header: 'Time',
             render: (t) => <span className="text-slate-400">{new Date(t.timestamp).toLocaleString()}</span>
         },
+        {
+            key: 'actions', header: '',
+            render: (t) => (
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleEnrich(t.srcIp); }}
+                    className="text-slate-500 hover:text-primary-400 transition-colors"
+                    title="Enrich IP"
+                >
+                    {enrichmentLoading[t.srcIp] ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                </button>
+            )
+        },
     ];
 
     return (
@@ -107,15 +163,28 @@ const Threats: React.FC = () => {
             {!loading && data && data.content.length === 0 ? (
                 <EmptyState title="No threats found" message="No threat events match your current filters." />
             ) : (
-                <DataTable
-                    columns={columns}
-                    data={data?.content || []}
-                    loading={loading}
-                    page={page}
-                    totalPages={data?.totalPages}
-                    onPageChange={setPage}
-                    keyExtractor={(t) => t.id}
-                />
+                <>
+                    <DataTable
+                        columns={columns}
+                        data={data?.content || []}
+                        loading={loading}
+                        page={page}
+                        totalPages={data?.totalPages}
+                        onPageChange={setPage}
+                        keyExtractor={(t) => t.id}
+                        onRowClick={(t) => handleExpand(t)}
+                        renderExpandedRow={expandedId ? (t) => {
+                            if (t.id !== expandedId) return null;
+                            const ip = t.srcIp;
+                            return (
+                                <ThreatEnrichmentPanel
+                                    enrichment={enrichmentData[ip] as never}
+                                    loading={enrichmentLoading[ip]}
+                                />
+                            );
+                        } : undefined}
+                    />
+                </>
             )}
         </div>
     );

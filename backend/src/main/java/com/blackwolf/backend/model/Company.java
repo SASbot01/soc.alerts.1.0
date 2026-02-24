@@ -20,4 +20,14 @@ public class Company {
     private String status;
     private LocalDateTime registeredAt;
     private Long totalThreats;
+
+    // Stripe billing fields
+    private String stripeCustomerId;
+    private String stripeSubscriptionId;
+    private String subscriptionStatus;
+    private LocalDateTime trialEndsAt;
+    private LocalDateTime currentPeriodEnd;
+    private Integer maxAssets;
+    private Integer maxUsers;
+    private Integer retentionDays;
 }

@@ -8,4 +8,8 @@ public interface CompanyRepository extends JpaRepository<Company, String> {
     Optional<Company> findByDomain(String domain);
 
     Optional<Company> findByApiKey(String apiKey);
+
+    Optional<Company> findByStripeCustomerId(String stripeCustomerId);
+
+    java.util.List<Company> findByRegisteredAtAfter(java.time.LocalDateTime after);
 }

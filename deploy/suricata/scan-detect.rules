@@ -2,6 +2,11 @@
 # BlackWolf SOC - Custom Scan Detection Rules
 # ================================================================
 
+# --- DROP: 80.94.95.0/24 (UNMANAGED LTD / SS-Net bulletproof hoster) ---
+# Known malicious infrastructure with 314k+ abuse reports. Block all traffic.
+drop ip 80.94.95.0/24 any -> $HOME_NET any (msg:"BLACKLIST SS-Net Bulletproof Hoster 80.94.95.0/24"; classtype:trojan-activity; sid:9000100; rev:1;)
+drop ip $HOME_NET any -> 80.94.95.0/24 any (msg:"BLACKLIST Outbound to SS-Net 80.94.95.0/24"; classtype:trojan-activity; sid:9000101; rev:1;)
+
 # --- SYN Scan (nmap -sS, masscan) ---
 # High rate SYN packets from single source = port scan
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"SCAN Nmap SYN Scan Detected"; flags:S,12; threshold: type both, track by_src, count 25, seconds 10; classtype:attempted-recon; sid:9000001; rev:2;)

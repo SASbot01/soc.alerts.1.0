@@ -24,6 +24,12 @@ public class OnboardingController {
         return ResponseEntity.ok(onboardingService.submit(form));
     }
 
+    // Public endpoint - submit form + create Stripe checkout (no card required, 14-day trial)
+    @PostMapping("/submit-and-checkout")
+    public ResponseEntity<OnboardingCheckoutResponse> submitAndCheckout(@RequestBody OnboardingFormRequest form) {
+        return ResponseEntity.ok(onboardingService.submitAndCheckout(form));
+    }
+
     // Superadmin endpoints
     @GetMapping("/requests")
     public ResponseEntity<List<OnboardingRequest>> listAll(Authentication auth) {

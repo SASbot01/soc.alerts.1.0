@@ -30,6 +30,7 @@ public class OnboardingDTOs {
         private String alertEmail;
         private String alertSlackWebhook;
         private String preferredSla;
+        private String selectedPlan;
     }
 
     @Data
@@ -48,5 +49,12 @@ public class OnboardingDTOs {
         private String tempPassword;
         private String domain;
         private String companyName;
+    }
+
+    @Data
+    public static class OnboardingCheckoutResponse {
+        private String onboardingRequestId;
+        private String checkoutUrl;
+        private String checkoutSessionId;
     }
 }

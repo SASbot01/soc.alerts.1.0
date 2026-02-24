@@ -277,6 +277,12 @@ export const playbookService = {
 
   getPlaybookAssignments: (playbookId: string) =>
     api.get(`/playbooks/${playbookId}/assignments`).then(r => r.data),
+
+  getGraph: (playbookId: string) =>
+    api.get(`/playbooks/${playbookId}/graph`).then(r => r.data),
+
+  saveGraph: (playbookId: string, graphData: { nodes: unknown[]; edges: unknown[] }) =>
+    api.put(`/playbooks/${playbookId}/graph`, graphData).then(r => r.data),
 };
 
 // ===== Assets =====
@@ -318,6 +324,163 @@ export const mitreService = {
 
   getIncidentMappings: (incidentId: string) =>
     api.get(`/mitre/incident/${incidentId}/mappings`).then(r => r.data),
+};
+
+// ===== AI Agent =====
+
+export const aiAgentService = {
+  getStats: () =>
+    api.get('/ai-agent/autonomous/stats').then(r => r.data),
+
+  getDecisions: (verdict?: string) =>
+    api.get('/ai-agent/autonomous/decisions', { params: verdict ? { verdict } : {} }).then(r => r.data),
+
+  getTokenStats: () =>
+    api.get('/ai-agent/autonomous/token-stats').then(r => r.data),
+};
+
+// ===== Integrations =====
+
+export const integrationService = {
+  list: () =>
+    api.get('/integrations').then(r => r.data),
+
+  getOverview: () =>
+    api.get('/integrations/overview').then(r => r.data),
+
+  getProviders: () =>
+    api.get('/integrations/providers').then(r => r.data),
+
+  save: (data: Record<string, unknown>) =>
+    api.post('/integrations', data).then(r => r.data),
+
+  toggle: (id: string) =>
+    api.post(`/integrations/${id}/toggle`).then(r => r.data),
+
+  test: (id: string) =>
+    api.post(`/integrations/${id}/test`).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete(`/integrations/${id}`).then(r => r.data),
+
+  createTicket: (integrationId: string, incidentId: string) =>
+    api.post(`/integrations/${integrationId}/ticket/${incidentId}`).then(r => r.data),
+
+  pageIncident: (integrationId: string, incidentId: string) =>
+    api.post(`/integrations/${integrationId}/page/${incidentId}`).then(r => r.data),
+
+  getTickets: (incidentId: string) =>
+    api.get(`/integrations/tickets/${incidentId}`).then(r => r.data),
+};
+
+// ===== Threat Intel =====
+
+export const threatIntelService = {
+  getEnrichment: (ip: string) =>
+    api.get(`/threats/enrichment/${ip}`).then(r => r.data),
+
+  enrichIp: (ip: string) =>
+    api.post(`/threats/enrich/${ip}`).then(r => r.data),
+};
+
+// ===== Billing =====
+
+export const billingService = {
+  getOverview: () =>
+    api.get('/billing/overview').then(r => r.data),
+
+  getPlans: () =>
+    api.get('/billing/plans').then(r => r.data),
+
+  createCheckout: (plan: string) =>
+    api.post('/billing/checkout', { plan }).then(r => r.data),
+
+  changePlan: (newPlan: string) =>
+    api.post('/billing/change-plan', { newPlan }).then(r => r.data),
+
+  cancel: () =>
+    api.post('/billing/cancel').then(r => r.data),
+
+  reactivate: () =>
+    api.post('/billing/reactivate').then(r => r.data),
+
+  createPortal: () =>
+    api.post('/billing/portal').then(r => r.data),
+};
+
+// ===== API Keys =====
+
+export const apiKeyService = {
+  list: () =>
+    api.get('/api-keys').then(r => r.data),
+
+  create: (data: { name: string; scopes?: string }) =>
+    api.post('/api-keys', data).then(r => r.data),
+
+  revoke: (id: string) =>
+    api.post(`/api-keys/${id}/revoke`).then(r => r.data),
+
+  rotate: (id: string) =>
+    api.post(`/api-keys/${id}/rotate`).then(r => r.data),
+
+  delete: (id: string) =>
+    api.delete(`/api-keys/${id}`).then(r => r.data),
+
+  getRetentionLogs: () =>
+    api.get('/api-keys/retention-logs').then(r => r.data),
+};
+
+// ===== SSO =====
+
+export const ssoService = {
+  checkSso: (domain: string) =>
+    api.get('/sso/check', { params: { domain } }).then(r => r.data),
+
+  authorize: (domain: string) =>
+    api.post('/sso/authorize', { domain }).then(r => r.data),
+
+  callback: (domain: string, code: string) =>
+    api.post('/sso/callback', { domain, code }).then(r => r.data),
+
+  getConfig: () =>
+    api.get('/sso/config').then(r => r.data),
+
+  saveConfig: (config: Record<string, unknown>) =>
+    api.post('/sso/config', config).then(r => r.data),
+
+  toggleActive: (active: boolean) =>
+    api.post('/sso/config/toggle', { active }).then(r => r.data),
+
+  deleteConfig: () =>
+    api.delete('/sso/config').then(r => r.data),
+
+  testConnection: (issuerUrl: string) =>
+    api.post('/sso/test', { issuerUrl }).then(r => r.data),
+};
+
+// ===== Roles & Permissions =====
+
+export const rbacService = {
+  listRoles: () =>
+    api.get('/roles').then(r => r.data),
+
+  getRole: (id: string) =>
+    api.get(`/roles/${id}`).then(r => r.data),
+
+  listPermissions: () =>
+    api.get('/roles/permissions').then(r => r.data),
+
+  createRole: (data: { name: string; displayName: string; description: string; permissions: string[] }) =>
+    api.post('/roles', data).then(r => r.data),
+
+  updateRole: (id: string, data: { displayName?: string; description?: string; permissions?: string[] }) =>
+    api.put(`/roles/${id}`, data).then(r => r.data),
+
+  deleteRole: (id: string) =>
+    api.delete(`/roles/${id}`).then(r => r.data),
+
+  assignRole: (userId: string, role: string) =>
+    api.post('/roles/assign', { userId, role }).then(r => r.data),
 };
 
 // ===== Reports =====
@@ -366,4 +529,27 @@ export const reportService = {
       link.click();
       link.remove();
     }),
+};
+
+// ===== Threat Hunting =====
+
+export const huntingService = {
+  list: () => api.get('/hunting').then(r => r.data),
+
+  get: (id: string) => api.get(`/hunting/${id}`).then(r => r.data),
+
+  create: (data: any) => api.post('/hunting', data).then(r => r.data),
+
+  update: (id: string, data: any) => api.put(`/hunting/${id}`, data).then(r => r.data),
+
+  delete: (id: string) => api.delete(`/hunting/${id}`).then(r => r.data),
+
+  execute: (id: string) => api.post(`/hunting/${id}/execute`).then(r => r.data),
+
+  search: (query: any) => api.post('/hunting/search', query).then(r => r.data),
+
+  aggregations: (field: string, timeRange: string = '24h') =>
+    api.get(`/hunting/aggregations?field=${field}&timeRange=${timeRange}`).then(r => r.data),
+
+  history: (id: string) => api.get(`/hunting/${id}/history`).then(r => r.data),
 };

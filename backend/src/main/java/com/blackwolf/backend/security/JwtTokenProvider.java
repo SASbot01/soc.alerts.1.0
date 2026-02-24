@@ -53,6 +53,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public int getExpirationMs() {
+        return jwtExpirationInMs;
+    }
+
     public String getUserUsernameFromJWT(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(key)

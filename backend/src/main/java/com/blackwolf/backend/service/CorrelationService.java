@@ -93,6 +93,11 @@ public class CorrelationService {
         }
     }
 
+    /** Normalize threat type for comparison: uppercase + underscores */
+    private static String normalizeType(String type) {
+        return type == null ? "" : type.toUpperCase().replaceAll("[\\s-]+", "_");
+    }
+
     private boolean matchesRule(ThreatEvent threat, CorrelationRule rule) {
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(rule.getTimeWindowMinutes());
         List<ThreatEvent> recentThreats = threatEventRepository.findByCompanyId(threat.getCompanyId())
@@ -105,22 +110,26 @@ public class CorrelationService {
                     threat.getSeverity() != null && threat.getSeverity() >= rule.getMinSeverity();
 
             case "same_ip_same_type" -> {
-                if (rule.getThreatType() != null && !rule.getThreatType().equals(threat.getThreatType())) {
+                if (rule.getThreatType() != null
+                        && !normalizeType(rule.getThreatType()).equals(normalizeType(threat.getThreatType()))) {
                     yield false;
                 }
+                String threatType = normalizeType(threat.getThreatType());
                 long count = recentThreats.stream()
                         .filter(t -> threat.getSrcIp().equals(t.getSrcIp())
-                                && threat.getThreatType().equals(t.getThreatType()))
+                                && threatType.equals(normalizeType(t.getThreatType())))
                         .count();
                 yield count >= rule.getThresholdCount();
             }
 
             case "same_type_threshold" -> {
-                if (rule.getThreatType() != null && !rule.getThreatType().equals(threat.getThreatType())) {
+                if (rule.getThreatType() != null
+                        && !normalizeType(rule.getThreatType()).equals(normalizeType(threat.getThreatType()))) {
                     yield false;
                 }
+                String threatType = normalizeType(threat.getThreatType());
                 long count = recentThreats.stream()
-                        .filter(t -> threat.getThreatType().equals(t.getThreatType()))
+                        .filter(t -> threatType.equals(normalizeType(t.getThreatType())))
                         .count();
                 yield count >= rule.getThresholdCount();
             }

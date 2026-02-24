@@ -187,26 +187,42 @@ function normalizeUrl(url) {
 async function checkServerHealth(url) {
   return new Promise((resolve) => {
     try {
-      const request = net.request({ url, method: 'HEAD', redirect: 'follow' });
+      // Check the SOC identity endpoint — only real BlackWolf SOC servers respond
+      const infoUrl = url.replace(/\/+$/, '') + '/api/v1/soc-info';
+      const request = net.request({ url: infoUrl, method: 'GET', redirect: 'follow' });
 
       const timeout = setTimeout(() => {
         request.abort();
-        resolve(false);
+        resolve({ reachable: false, isSoc: false });
       }, 8000);
 
+      let body = '';
+
       request.on('response', (response) => {
-        clearTimeout(timeout);
-        resolve(response.statusCode < 500);
+        response.on('data', (chunk) => { body += chunk.toString(); });
+        response.on('end', () => {
+          clearTimeout(timeout);
+          try {
+            const data = JSON.parse(body);
+            if (data.app === 'blackwolf-soc') {
+              resolve({ reachable: true, isSoc: true, version: data.version });
+            } else {
+              resolve({ reachable: true, isSoc: false });
+            }
+          } catch {
+            resolve({ reachable: true, isSoc: false });
+          }
+        });
       });
 
       request.on('error', () => {
         clearTimeout(timeout);
-        resolve(false);
+        resolve({ reachable: false, isSoc: false });
       });
 
       request.end();
     } catch {
-      resolve(false);
+      resolve({ reachable: false, isSoc: false });
     }
   });
 }
@@ -441,8 +457,8 @@ function startConnectionMonitor(serverUrl) {
 
   connectionCheckInterval = setInterval(async () => {
     if (!mainWindow) return;
-    const healthy = await checkServerHealth(serverUrl);
-    if (!healthy) {
+    const health = await checkServerHealth(serverUrl);
+    if (!health.reachable || !health.isSoc) {
       injectOfflineOverlay();
     }
   }, 30000);
@@ -502,11 +518,19 @@ function setupIpcHandlers() {
       url = normalizeUrl(url);
       new URL(url); // Validate format
 
-      const healthy = await checkServerHealth(url);
-      if (!healthy) {
+      const health = await checkServerHealth(url);
+
+      if (!health.reachable) {
         return {
           success: false,
-          error: 'Could not reach the server. Check the URL and ensure the platform is running.'
+          error: 'Could not reach the server. Check the URL and ensure the SOC platform is running.'
+        };
+      }
+
+      if (!health.isSoc) {
+        return {
+          success: false,
+          error: 'This URL does not point to a BlackWolf SOC server. Enter the URL where your SOC platform is deployed.'
         };
       }
 
@@ -564,8 +588,14 @@ app.whenReady().then(() => {
 
   const lastServer = store.get('lastServer', null);
   if (lastServer) {
-    currentServerUrl = lastServer;
-    createMainWindow(lastServer);
+    checkServerHealth(lastServer).then(health => {
+      if (health.reachable && health.isSoc) {
+        currentServerUrl = lastServer;
+        createMainWindow(lastServer);
+      } else {
+        createConnectWindow();
+      }
+    });
   } else {
     createConnectWindow();
   }

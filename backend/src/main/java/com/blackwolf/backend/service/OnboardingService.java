@@ -1,5 +1,6 @@
 package com.blackwolf.backend.service;
 
+import com.blackwolf.backend.dto.BillingDTOs.CheckoutResponse;
 import com.blackwolf.backend.dto.OnboardingDTOs.*;
 import com.blackwolf.backend.model.*;
 import com.blackwolf.backend.repository.*;
@@ -34,6 +35,15 @@ public class OnboardingService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private BillingService billingService;
+
+    @Autowired
+    private EmailSequenceService emailSequenceService;
+
+    @Autowired
+    private SalesOutreachBot salesOutreachBot;
+
     public OnboardingRequest submit(OnboardingFormRequest form) {
         OnboardingRequest req = new OnboardingRequest();
         req.setId(UUID.randomUUID().toString());
@@ -57,9 +67,79 @@ public class OnboardingService {
         req.setAlertEmail(form.getAlertEmail());
         req.setAlertSlackWebhook(form.getAlertSlackWebhook());
         req.setPreferredSla(form.getPreferredSla());
+        req.setSelectedPlan(form.getSelectedPlan());
         req.setStatus("pending");
         req.setCreatedAt(LocalDateTime.now());
         return repository.save(req);
+    }
+
+    /**
+     * Submit the onboarding form + create a Stripe Checkout session (no card required, 14-day trial).
+     * Returns the checkout URL so the frontend can redirect the user.
+     */
+    public OnboardingCheckoutResponse submitAndCheckout(OnboardingFormRequest form) {
+        OnboardingRequest req = submit(form);
+
+        String plan = form.getSelectedPlan() != null ? form.getSelectedPlan() : "starter";
+
+        CheckoutResponse checkout = billingService.createOnboardingCheckoutSession(
+                req.getId(), req.getContactEmail(), req.getCompanyName(), plan);
+
+        OnboardingCheckoutResponse response = new OnboardingCheckoutResponse();
+        response.setOnboardingRequestId(req.getId());
+        response.setCheckoutUrl(checkout.getUrl());
+        response.setCheckoutSessionId(checkout.getSessionId());
+
+        log.info("Onboarding submit-and-checkout completed for {} (plan: {})", req.getContactEmail(), plan);
+        return response;
+    }
+
+    /**
+     * Called by StripeWebhookService when checkout.session.completed has onboardingRequestId metadata.
+     * Idempotent — skips if company with this domain already exists.
+     */
+    @Transactional
+    public ProvisionResult provisionFromWebhook(String onboardingRequestId, String stripeCustomerId, String stripeSubscriptionId) {
+        OnboardingRequest req = repository.findById(onboardingRequestId)
+                .orElseThrow(() -> new RuntimeException("Onboarding request not found: " + onboardingRequestId));
+
+        // Idempotency: skip if already provisioned
+        if ("provisioned".equals(req.getStatus())) {
+            log.info("Onboarding {} already provisioned, skipping", onboardingRequestId);
+            return null;
+        }
+
+        // Provision the company
+        ProvisionResult result = provisionCompany(req);
+        if (result == null) {
+            log.warn("provisionCompany returned null for onboarding {}", onboardingRequestId);
+            return null;
+        }
+
+        // Link Stripe customer + subscription to the new company
+        companyRepository.findById(result.companyId()).ifPresent(company -> {
+            company.setStripeCustomerId(stripeCustomerId);
+            company.setStripeSubscriptionId(stripeSubscriptionId);
+            company.setSubscriptionStatus("trialing");
+
+            String plan = req.getSelectedPlan() != null ? req.getSelectedPlan() : "starter";
+            company.setPlan(plan);
+            var limits = BillingService.getLimitsForPlan(plan);
+            company.setMaxAssets(limits.getMaxAssets());
+            company.setMaxUsers(limits.getMaxUsers());
+            company.setRetentionDays(limits.getRetentionDays());
+
+            companyRepository.save(company);
+            log.info("Stripe linked to company {}: customer={}, subscription={}", result.companyId(), stripeCustomerId, stripeSubscriptionId);
+        });
+
+        // Mark onboarding as provisioned
+        req.setStatus("provisioned");
+        req.setReviewedBy("stripe-auto");
+        req.setReviewedAt(LocalDateTime.now());
+        repository.save(req);
+
+        return result;
     }
 
     public List<OnboardingRequest> listAll() {
@@ -99,7 +179,7 @@ public class OnboardingService {
         return response;
     }
 
-    private record ProvisionResult(String companyId, String apiKey, String tempPassword) {}
+    public record ProvisionResult(String companyId, String apiKey, String tempPassword) {}
 
     private ProvisionResult provisionCompany(OnboardingRequest req) {
         // Check if company already exists
@@ -175,6 +255,30 @@ public class OnboardingService {
             slackAlert.setCreatedAt(LocalDateTime.now());
             alertConfigRepository.save(slackAlert);
             log.info("Slack alert configured");
+        }
+
+        // 4. Create Stripe customer for billing
+        try {
+            billingService.createStripeCustomer(company);
+            log.info("Stripe customer created for {}", req.getCompanyName());
+        } catch (Exception e) {
+            log.warn("Failed to create Stripe customer for {}: {}", req.getCompanyName(), e.getMessage());
+        }
+
+        // 5. Schedule onboarding email drip sequence
+        try {
+            emailSequenceService.scheduleOnboardingSequence(
+                    companyId, req.getContactEmail(), req.getCompanyName(), tempPassword);
+            log.info("Onboarding email sequence scheduled for {}", req.getContactEmail());
+        } catch (Exception e) {
+            log.warn("Failed to schedule onboarding emails for {}: {}", req.getCompanyName(), e.getMessage());
+        }
+
+        // 6. Mark prospect as converted (if they came from outreach)
+        try {
+            salesOutreachBot.markConverted(req.getContactEmail(), companyId);
+        } catch (Exception e) {
+            log.debug("No prospect record for {} (direct signup)", req.getContactEmail());
         }
 
         log.info("=== Provisioning complete for {} ===", req.getCompanyName());

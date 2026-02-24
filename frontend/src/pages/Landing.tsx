@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, ArrowRight, Check, Server, Globe, Mail, Shield } from 'lucide-react';
+import { ShieldAlert, ArrowRight, Check, Server, Globe, Mail, Shield, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 import clsx from 'clsx';
+
+const PLANS = [
+    { id: 'starter', name: 'Starter', price: '$1,999/mo', desc: '50 assets, 5 users, 30-day retention' },
+    { id: 'professional', name: 'Professional', price: '$4,999/mo', desc: '200 assets, 15 users, AI agent, MITRE mapping' },
+    { id: 'enterprise', name: 'Enterprise', price: '$9,999/mo', desc: '500 assets, unlimited users, dedicated support' },
+];
 
 const Landing: React.FC = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(0);
-    const [submitted, setSubmitted] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
     const [form, setForm] = useState({
@@ -17,6 +23,7 @@ const Landing: React.FC = () => {
         numServers: 0, numEndpoints: 0, numLocations: 1,
         currentSecurityTools: '', additionalNotes: '',
         alertEmail: '', alertSlackWebhook: '', preferredSla: 'standard',
+        selectedPlan: 'starter',
     });
 
     const updateForm = (fields: Partial<typeof form>) => setForm({ ...form, ...fields });
@@ -27,36 +34,18 @@ const Landing: React.FC = () => {
             setError('You must accept the Terms of Service and Data Processing Agreement.');
             return;
         }
+        setSubmitting(true);
         try {
-            await api.post('/onboarding/submit', form);
-            setSubmitted(true);
+            const res = await api.post('/onboarding/submit-and-checkout', form);
+            // Redirect to Stripe Checkout (no card required, 14-day trial)
+            window.location.href = res.data.checkoutUrl;
         } catch (err: any) {
             setError(err.response?.data?.message || 'Submission failed. Please try again.');
+            setSubmitting(false);
         }
     };
 
-    if (submitted) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-                    <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-primary-900/10 blur-[100px]" />
-                    <div className="absolute top-[40%] -right-[10%] w-[50%] h-[50%] rounded-full bg-indigo-900/10 blur-[100px]" />
-                </div>
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-[2px] p-8 max-w-md text-center relative z-10">
-                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Check className="w-8 h-8 text-green-400" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">Request Submitted</h2>
-                    <p className="text-slate-400 mb-6">Our team will review your request and contact you within 24-48 hours.</p>
-                    <button onClick={() => navigate('/login')} className="px-6 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors">
-                        Go to Login
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    const steps = ['Company Info', 'Legal', 'SOC Config', 'Infrastructure', 'Alerts'];
+    const steps = ['Company Info', 'Legal', 'SOC Config', 'Infrastructure', 'Alerts', 'Plan'];
 
     return (
         <div className="min-h-screen bg-slate-950 relative overflow-hidden">
@@ -72,9 +61,14 @@ const Landing: React.FC = () => {
                     <ShieldAlert className="w-8 h-8 text-primary-400" />
                     <span className="text-2xl font-bold headline-metallic">BlackWolf Defense</span>
                 </div>
-                <button onClick={() => navigate('/login')} className="px-4 py-2 text-slate-400 hover:text-white border border-slate-700 rounded-[2px] transition-colors">
-                    Client Login
-                </button>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate('/pricing')} className="px-4 py-2 text-slate-400 hover:text-white transition-colors">
+                        Pricing
+                    </button>
+                    <button onClick={() => navigate('/login')} className="px-4 py-2 text-slate-400 hover:text-white border border-slate-700 rounded-[2px] transition-colors">
+                        Client Login
+                    </button>
+                </div>
             </header>
 
             {/* Hero */}
@@ -196,6 +190,38 @@ const Landing: React.FC = () => {
                                 </div>
                             </>
                         )}
+
+                        {/* Step 6: Plan Selection */}
+                        {step === 6 && (
+                            <>
+                                <p className="text-sm text-slate-400 mb-2">Select your plan. All plans include a <span className="text-green-400 font-semibold">14-day free trial</span> — no credit card required.</p>
+                                <div className="space-y-3">
+                                    {PLANS.map(p => (
+                                        <label key={p.id} className={clsx(
+                                            "flex items-center gap-4 p-4 border rounded-[2px] cursor-pointer transition-all",
+                                            form.selectedPlan === p.id
+                                                ? "border-white bg-white/5"
+                                                : "border-slate-700 hover:border-slate-500"
+                                        )}>
+                                            <input type="radio" name="plan" value={p.id} checked={form.selectedPlan === p.id}
+                                                onChange={() => updateForm({ selectedPlan: p.id })} className="hidden" />
+                                            <div className={clsx("w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                                                form.selectedPlan === p.id ? "border-white" : "border-slate-600"
+                                            )}>
+                                                {form.selectedPlan === p.id && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-white font-semibold">{p.name}</span>
+                                                    <span className="text-primary-400 font-bold">{p.price}</span>
+                                                </div>
+                                                <p className="text-sm text-slate-400 mt-1">{p.desc}</p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Nav Buttons */}
@@ -203,13 +229,16 @@ const Landing: React.FC = () => {
                         <button onClick={() => setStep(step - 1)} className="px-6 py-2 text-slate-400 hover:text-white transition-colors">
                             Back
                         </button>
-                        {step < 5 ? (
+                        {step < 6 ? (
                             <button onClick={() => setStep(step + 1)} className="px-6 py-2 bg-white hover:bg-[#E0E0E0] text-black rounded-[2px] transition-colors flex items-center gap-2">
                                 Next <ArrowRight className="w-4 h-4" />
                             </button>
                         ) : (
-                            <button onClick={handleSubmit} className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-[2px] transition-colors">
-                                Submit Request
+                            <button onClick={handleSubmit} disabled={submitting} className={clsx(
+                                "px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-[2px] transition-colors flex items-center gap-2",
+                                submitting && "opacity-70 cursor-not-allowed"
+                            )}>
+                                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Starting Trial...</> : 'Start 14-Day Free Trial'}
                             </button>
                         )}
                     </div>

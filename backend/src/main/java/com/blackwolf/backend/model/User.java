@@ -22,4 +22,13 @@ public class User {
     private boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime lastLogin;
+
+    // MFA/TOTP
+    private boolean mfaEnabled;
+
+    @JsonIgnore
+    private String mfaSecret;
+
+    @JsonIgnore
+    private String mfaRecoveryCodes;
 }

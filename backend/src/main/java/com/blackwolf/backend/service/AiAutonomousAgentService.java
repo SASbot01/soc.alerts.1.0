@@ -46,6 +46,8 @@ public class AiAutonomousAgentService {
     @Autowired private ThreatEnrichmentRepository enrichmentRepository;
     @Autowired private SseService sseService;
     @Autowired private CompanyRepository companyRepository;
+    @Autowired private IncidentRepository incidentRepository;
+    @Autowired(required = false) private com.blackwolf.backend.service.ai.CortexService cortexService;
 
     @Value("${ai.claude.api-key:}")
     private String apiKey;
@@ -327,17 +329,12 @@ public class AiAutonomousAgentService {
                 sseService.emitAiAgentLog(companyId, "WARN",
                         "ESCALATED", "Suspicious activity from " + threat.getSrcIp() + " escalated - " + threat.getThreatType());
 
-                // Create medium-priority incident
+                // Create or deduplicate incident
                 if (autoIncidentEnabled) {
                     try {
-                        Incident incident = incidentService.createFromThreat(
-                                companyId, threat.getId(), threat.getThreatType(),
-                                threat.getSeverity(),
-                                "[AI Agent] " + analysis.reasoning);
+                        Incident incident = deduplicateOrCreateIncident(
+                                companyId, threat, analysis, "medium", actionsExecuted);
                         decision.setIncidentCreatedId(incident.getId());
-                        actionsExecuted.add("incident_created:" + incident.getId());
-                        sseService.emitAiAgentLog(companyId, "WARN",
-                                "INCIDENT_CREATED", "Incident created for suspicious threat from " + threat.getSrcIp());
 
                         incidentService.addTimelineEntry(incident.getId(), "AI Analysis",
                                 "Verdict: " + analysis.verdict + " | Confidence: " + Math.round(analysis.confidence * 100) + "%\nReasoning: " + analysis.reasoning, "ai-agent");
@@ -358,17 +355,12 @@ public class AiAutonomousAgentService {
                 sseService.emitAiAgentLog(companyId, "ERROR",
                         "REAL_ATTACK", "REAL ATTACK detected from " + threat.getSrcIp() + " - " + threat.getThreatType() + " (severity " + threat.getSeverity() + ")");
 
-                // Create high-priority incident
+                // Create or deduplicate incident
                 if (autoIncidentEnabled) {
                     try {
-                        Incident incident = incidentService.createFromThreat(
-                                companyId, threat.getId(), threat.getThreatType(),
-                                threat.getSeverity(),
-                                "[AI Agent - REAL ATTACK] " + analysis.reasoning);
+                        Incident incident = deduplicateOrCreateIncident(
+                                companyId, threat, analysis, "high", actionsExecuted);
                         decision.setIncidentCreatedId(incident.getId());
-                        actionsExecuted.add("incident_created:" + incident.getId());
-                        sseService.emitAiAgentLog(companyId, "ERROR",
-                                "INCIDENT_CREATED", "High-priority incident created for attack from " + threat.getSrcIp());
 
                         incidentService.addTimelineEntry(incident.getId(), "AI Analysis",
                                 "Verdict: " + analysis.verdict + " | Confidence: " + Math.round(analysis.confidence * 100) + "%\nReasoning: " + analysis.reasoning, "ai-agent");
@@ -426,18 +418,12 @@ public class AiAutonomousAgentService {
                 sseService.emitAiAgentLog(companyId, "CRITICAL",
                         "CRITICAL_ATTACK", "CRITICAL ATTACK from " + threat.getSrcIp() + " - " + threat.getThreatType() + " (severity " + threat.getSeverity() + "). Maximum response initiated.");
 
-                // Create critical incident
+                // Create or deduplicate critical incident
                 if (autoIncidentEnabled) {
                     try {
-                        Incident incident = incidentService.createFromThreat(
-                                companyId, threat.getId(), threat.getThreatType(),
-                                10,
-                                "[AI AGENT - CRITICAL ATTACK DETECTED]\n\n" + analysis.reasoning
-                                        + "\n\nConfidence: " + analysis.confidence);
+                        Incident incident = deduplicateOrCreateIncident(
+                                companyId, threat, analysis, "critical", actionsExecuted);
                         decision.setIncidentCreatedId(incident.getId());
-                        actionsExecuted.add("critical_incident_created:" + incident.getId());
-                        sseService.emitAiAgentLog(companyId, "CRITICAL",
-                                "INCIDENT_CREATED", "Critical incident created - Maximum priority response for " + threat.getSrcIp());
 
                         incidentService.addTimelineEntry(incident.getId(), "AI Analysis",
                                 "Verdict: CRITICAL_ATTACK | Confidence: " + Math.round(analysis.confidence * 100) + "%\nReasoning: " + analysis.reasoning, "ai-agent");
@@ -495,10 +481,72 @@ public class AiAutonomousAgentService {
 
         decisionRepository.save(decision);
 
+        // Record decision in Cortex for learning
+        if (cortexService != null) {
+            try {
+                cortexService.recordDecision(companyId, decision.getVerdict().name(),
+                        threat.getThreatType(), threat.getId(),
+                        decision.getConfidence() != null ? decision.getConfidence().doubleValue() : null,
+                        Map.of("severity", threat.getSeverity(), "srcIp", String.valueOf(threat.getSrcIp())));
+            } catch (Exception ignored) {}
+        }
+
         // Emit SSE event for dashboard update
         sseService.emitDashboardUpdate(companyId);
 
         return decision;
+    }
+
+    // ===== INCIDENT DEDUPLICATION =====
+
+    private Incident deduplicateOrCreateIncident(String companyId, ThreatEvent threat,
+                                                   ThreatAnalysis analysis, String newSeverity,
+                                                   List<String> actionsExecuted) {
+        if (threat.getSrcIp() != null) {
+            List<Incident> existing = incidentRepository.findOpenBySourceIp(companyId, threat.getSrcIp());
+            if (!existing.isEmpty()) {
+                Incident incident = existing.get(0);
+                // Escalate severity if new event is more severe
+                if (compareSeverity(newSeverity, incident.getSeverity()) > 0) {
+                    incident.setSeverity(newSeverity);
+                    incident.setUpdatedAt(LocalDateTime.now());
+                    incidentRepository.save(incident);
+                }
+                incidentService.addTimelineEntry(incident.getId(), "Correlated Event",
+                        "New threat from same IP " + threat.getSrcIp() + ": " + threat.getThreatType()
+                                + " (severity " + threat.getSeverity() + "). AI verdict: " + analysis.verdict, "ai-agent");
+                actionsExecuted.add("incident_escalated:" + incident.getId());
+                sseService.emitAiAgentLog(companyId, "INFO",
+                        "INCIDENT_CORRELATED", "Correlated to existing incident " + incident.getId().substring(0, 8) + " for IP " + threat.getSrcIp());
+                return incident;
+            }
+        }
+
+        // No existing incident, create new
+        String description = analysis.verdict == AiDecision.Verdict.CRITICAL_ATTACK
+                ? "[AI AGENT - CRITICAL ATTACK DETECTED]\n\n" + analysis.reasoning + "\n\nConfidence: " + analysis.confidence
+                : "[AI Agent" + (analysis.verdict == AiDecision.Verdict.REAL_ATTACK ? " - REAL ATTACK" : "") + "] " + analysis.reasoning;
+        int severity = analysis.verdict == AiDecision.Verdict.CRITICAL_ATTACK ? 10 : threat.getSeverity();
+        Incident incident = incidentService.createFromThreat(companyId, threat.getId(), threat.getThreatType(), severity, description);
+        actionsExecuted.add("incident_created:" + incident.getId());
+        sseService.emitAiAgentLog(companyId, "WARN",
+                "INCIDENT_CREATED", "Incident created for " + analysis.verdict + " from " + threat.getSrcIp());
+        return incident;
+    }
+
+    private static int severityRank(String severity) {
+        if (severity == null) return 0;
+        return switch (severity.toLowerCase()) {
+            case "critical" -> 4;
+            case "high" -> 3;
+            case "medium" -> 2;
+            case "low" -> 1;
+            default -> 0;
+        };
+    }
+
+    private static int compareSeverity(String a, String b) {
+        return Integer.compare(severityRank(a), severityRank(b));
     }
 
     // ===== NOISE SUPPRESSION =====
@@ -901,6 +949,8 @@ public class AiAutonomousAgentService {
                 blockedIPRepository.save(blocked);
                 log.info("AI Agent: Blocked IP {} for {} hours - {}", ip, hours, reason);
             }
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.debug("AI Agent: IP {} already blocked for company {}", ip, companyId);
         } catch (Exception e) {
             log.error("AI Agent: Failed to block IP {}: {}", ip, e.getMessage());
         }
@@ -999,6 +1049,43 @@ public class AiAutonomousAgentService {
 
     public void deleteNoisePattern(String patternId) {
         noisePatternRepository.deleteById(patternId);
+    }
+
+    // ===== TOKEN STATISTICS =====
+
+    public Map<String, Object> getTokenStats(String companyId) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        long totalTokens = decisionRepository.sumTokensByCompanyId(companyId);
+        stats.put("totalTokens", totalTokens);
+
+        LocalDateTime now = LocalDateTime.now();
+        stats.put("tokens24h", decisionRepository.sumTokensSince(companyId, now.minusHours(24)));
+        stats.put("tokens7d", decisionRepository.sumTokensSince(companyId, now.minusDays(7)));
+        stats.put("tokens30d", decisionRepository.sumTokensSince(companyId, now.minusDays(30)));
+
+        stats.put("avgTokensPerDecision", decisionRepository.avgTokensPerDecision(companyId));
+
+        // Verdict breakdown: verdict -> { tokens, count }
+        List<Object[]> breakdown = decisionRepository.tokenBreakdownByVerdict(companyId);
+        List<Map<String, Object>> verdictBreakdown = new ArrayList<>();
+        for (Object[] row : breakdown) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("verdict", row[0].toString());
+            entry.put("tokens", ((Number) row[1]).longValue());
+            entry.put("count", ((Number) row[2]).longValue());
+            verdictBreakdown.add(entry);
+        }
+        stats.put("verdictBreakdown", verdictBreakdown);
+
+        // Estimated cost: Sonnet 4 pricing ($3/1M input, $15/1M output)
+        // Assume ~75% input, ~25% output tokens ratio
+        double inputTokens = totalTokens * 0.75;
+        double outputTokens = totalTokens * 0.25;
+        double estimatedCost = (inputTokens / 1_000_000.0) * 3.0 + (outputTokens / 1_000_000.0) * 15.0;
+        stats.put("estimatedCostUsd", Math.round(estimatedCost * 100.0) / 100.0);
+
+        return stats;
     }
 
     // ===== INTERNAL TYPES =====

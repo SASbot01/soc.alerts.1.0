@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +50,9 @@ public class PlaybookService {
 
     @Autowired
     private ActivityLogService activityLogService;
+
+    @Autowired
+    private PlaybookEdgeRepository edgeRepository;
 
     @Autowired
     private AssetPlaybookAssignmentRepository assignmentRepository;
@@ -409,6 +414,119 @@ public class PlaybookService {
         }).collect(Collectors.toList());
     }
 
+    // ===== Visual Builder Graph =====
+
+    public Map<String, Object> getGraph(String playbookId, String companyId) {
+        Playbook playbook = playbookRepository.findById(playbookId)
+                .orElseThrow(() -> new RuntimeException("Playbook not found"));
+        if (!playbook.getCompanyId().equals(companyId)) {
+            throw new RuntimeException("Access denied");
+        }
+
+        List<PlaybookStep> steps = stepRepository.findByPlaybookIdOrderByStepOrderAsc(playbookId);
+        List<PlaybookEdge> edges = edgeRepository.findByPlaybookId(playbookId);
+
+        List<Map<String, Object>> nodes = steps.stream().map(s -> {
+            Map<String, Object> node = new LinkedHashMap<>();
+            node.put("id", s.getId());
+            node.put("stepOrder", s.getStepOrder());
+            node.put("actionType", s.getActionType().name());
+            node.put("actionConfig", s.getActionConfig());
+            node.put("description", s.getDescription());
+            node.put("nodeType", s.getNodeType() != null ? s.getNodeType() : "action");
+            node.put("positionX", s.getPositionX() != null ? s.getPositionX() : 0);
+            node.put("positionY", s.getPositionY() != null ? s.getPositionY() : 0);
+            node.put("conditionExpression", s.getConditionExpression());
+            node.put("onSuccessStepId", s.getOnSuccessStepId());
+            node.put("onFailureStepId", s.getOnFailureStepId());
+            node.put("isParallel", Boolean.TRUE.equals(s.getIsParallel()));
+            return node;
+        }).collect(Collectors.toList());
+
+        List<Map<String, Object>> edgeList = edges.stream().map(e -> {
+            Map<String, Object> edge = new LinkedHashMap<>();
+            edge.put("id", e.getId());
+            edge.put("source", e.getSourceStepId());
+            edge.put("target", e.getTargetStepId());
+            edge.put("label", e.getEdgeLabel());
+            edge.put("type", e.getEdgeType());
+            edge.put("conditionExpression", e.getConditionExpression());
+            return edge;
+        }).collect(Collectors.toList());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("playbookId", playbookId);
+        result.put("nodes", nodes);
+        result.put("edges", edgeList);
+        return result;
+    }
+
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> saveGraph(String playbookId, String companyId, Map<String, Object> graphData, String performedBy) {
+        Playbook playbook = playbookRepository.findById(playbookId)
+                .orElseThrow(() -> new RuntimeException("Playbook not found"));
+        if (!playbook.getCompanyId().equals(companyId)) {
+            throw new RuntimeException("Access denied");
+        }
+
+        // Delete existing steps and edges
+        stepRepository.deleteByPlaybookId(playbookId);
+        edgeRepository.deleteByPlaybookId(playbookId);
+
+        // Save nodes as steps
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) graphData.getOrDefault("nodes", List.of());
+        int order = 0;
+        for (Map<String, Object> node : nodes) {
+            PlaybookStep step = new PlaybookStep();
+            step.setId((String) node.get("id"));
+            step.setPlaybookId(playbookId);
+            step.setStepOrder(order++);
+            step.setActionType(PlaybookStep.ActionType.valueOf((String) node.getOrDefault("actionType", "SEND_ALERT")));
+            step.setActionConfig((String) node.get("actionConfig"));
+            step.setDescription((String) node.get("description"));
+            step.setNodeType((String) node.getOrDefault("nodeType", "action"));
+            step.setPositionX(toDouble(node.get("positionX")));
+            step.setPositionY(toDouble(node.get("positionY")));
+            step.setConditionExpression((String) node.get("conditionExpression"));
+            step.setOnSuccessStepId((String) node.get("onSuccessStepId"));
+            step.setOnFailureStepId((String) node.get("onFailureStepId"));
+            step.setIsParallel(Boolean.TRUE.equals(node.get("isParallel")));
+            step.setCreatedAt(LocalDateTime.now());
+            stepRepository.save(step);
+        }
+
+        // Save edges
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) graphData.getOrDefault("edges", List.of());
+        for (Map<String, Object> edge : edges) {
+            PlaybookEdge e = new PlaybookEdge();
+            e.setId((String) edge.getOrDefault("id", UUID.randomUUID().toString()));
+            e.setPlaybookId(playbookId);
+            e.setSourceStepId((String) edge.get("source"));
+            e.setTargetStepId((String) edge.get("target"));
+            e.setEdgeLabel((String) edge.get("label"));
+            e.setEdgeType((String) edge.getOrDefault("type", "default"));
+            e.setConditionExpression((String) edge.get("conditionExpression"));
+            edgeRepository.save(e);
+        }
+
+        playbook.setUpdatedAt(LocalDateTime.now());
+        playbookRepository.save(playbook);
+
+        activityLogService.log(companyId, "PLAYBOOK", playbookId, "GRAPH_UPDATED", performedBy,
+                "Playbook graph updated: " + nodes.size() + " nodes, " + edges.size() + " edges");
+
+        return getGraph(playbookId, companyId);
+    }
+
+    private Double toDouble(Object val) {
+        if (val instanceof Number) return ((Number) val).doubleValue();
+        if (val instanceof String) {
+            try { return Double.parseDouble((String) val); } catch (NumberFormatException e) { return 0.0; }
+        }
+        return 0.0;
+    }
+
     // ===== Trigger Logic =====
 
     // Automated trigger from threat events
@@ -564,14 +682,23 @@ public class PlaybookService {
     @Async
     protected void executeStepsAsync(String executionId, Playbook playbook, String companyId, String srcIp) {
         List<PlaybookStep> steps = stepRepository.findByPlaybookIdOrderByStepOrderAsc(playbook.getId());
-        boolean failed = false;
+        List<PlaybookEdge> edges = edgeRepository.findByPlaybookId(playbook.getId());
 
+        // If graph has edges, use graph-based execution; otherwise fall back to linear
+        if (!edges.isEmpty()) {
+            executeGraphBased(executionId, steps, edges, companyId, srcIp);
+        } else {
+            executeLinear(executionId, steps, companyId, srcIp);
+        }
+    }
+
+    private void executeLinear(String executionId, List<PlaybookStep> steps, String companyId, String srcIp) {
+        boolean failed = false;
         for (PlaybookStep step : steps) {
             if (failed) {
                 logStepResult(executionId, step.getId(), PlaybookExecutionLog.LogStatus.SKIPPED, "Skipped due to previous failure");
                 continue;
             }
-
             try {
                 String output = executeStep(step, companyId, srcIp);
                 logStepResult(executionId, step.getId(), PlaybookExecutionLog.LogStatus.SUCCESS, output);
@@ -581,7 +708,181 @@ public class PlaybookService {
                 failed = true;
             }
         }
+        finalizeExecution(executionId, failed);
+    }
 
+    private void executeGraphBased(String executionId, List<PlaybookStep> steps, List<PlaybookEdge> edges,
+                                    String companyId, String srcIp) {
+        Map<String, PlaybookStep> stepMap = steps.stream().collect(Collectors.toMap(PlaybookStep::getId, s -> s));
+        // Build adjacency: sourceId -> list of edges
+        Map<String, List<PlaybookEdge>> adjacency = edges.stream()
+                .collect(Collectors.groupingBy(PlaybookEdge::getSourceStepId));
+        // Track which steps have incoming edges (to find start nodes)
+        Set<String> hasIncoming = edges.stream().map(PlaybookEdge::getTargetStepId).collect(Collectors.toSet());
+
+        // Find start nodes: nodes with no incoming edges (or trigger type)
+        List<String> startNodes = steps.stream()
+                .filter(s -> !hasIncoming.contains(s.getId()) || "trigger".equals(s.getNodeType()))
+                .map(PlaybookStep::getId)
+                .collect(Collectors.toList());
+
+        if (startNodes.isEmpty() && !steps.isEmpty()) {
+            startNodes = List.of(steps.get(0).getId()); // fallback: first step
+        }
+
+        Set<String> visited = ConcurrentHashMap.newKeySet();
+        Map<String, String> stepResults = new ConcurrentHashMap<>(); // stepId -> "SUCCESS" or "FAILED"
+        boolean failed = false;
+
+        // BFS-style graph traversal with parallel support
+        Queue<List<String>> executionQueue = new LinkedList<>();
+        executionQueue.add(startNodes);
+
+        while (!executionQueue.isEmpty()) {
+            List<String> currentBatch = executionQueue.poll();
+            if (currentBatch == null || currentBatch.isEmpty()) continue;
+
+            // Separate parallel and sequential steps in this batch
+            List<String> parallelSteps = new ArrayList<>();
+            List<String> sequentialSteps = new ArrayList<>();
+
+            for (String stepId : currentBatch) {
+                if (visited.contains(stepId)) continue;
+                PlaybookStep step = stepMap.get(stepId);
+                if (step == null) continue;
+                if (Boolean.TRUE.equals(step.getIsParallel())) {
+                    parallelSteps.add(stepId);
+                } else {
+                    sequentialSteps.add(stepId);
+                }
+            }
+
+            // Execute parallel steps concurrently
+            if (!parallelSteps.isEmpty()) {
+                List<CompletableFuture<Void>> futures = parallelSteps.stream()
+                        .filter(visited::add)
+                        .map(stepId -> CompletableFuture.runAsync(() -> {
+                            PlaybookStep step = stepMap.get(stepId);
+                            try {
+                                String output = executeStep(step, companyId, srcIp);
+                                logStepResult(executionId, stepId, PlaybookExecutionLog.LogStatus.SUCCESS, output);
+                                stepResults.put(stepId, "SUCCESS");
+                            } catch (Exception e) {
+                                log.error("SOAR: Parallel step {} failed: {}", step.getActionType(), e.getMessage());
+                                logStepResult(executionId, stepId, PlaybookExecutionLog.LogStatus.FAILED, e.getMessage());
+                                stepResults.put(stepId, "FAILED");
+                            }
+                        }))
+                        .collect(Collectors.toList());
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            }
+
+            // Execute sequential steps one by one
+            for (String stepId : sequentialSteps) {
+                if (!visited.add(stepId)) continue;
+                PlaybookStep step = stepMap.get(stepId);
+
+                if ("condition".equals(step.getNodeType()) || step.getActionType() == PlaybookStep.ActionType.CONDITION) {
+                    // Evaluate condition and branch
+                    boolean conditionResult = evaluateCondition(step, companyId, srcIp, stepResults);
+                    logStepResult(executionId, stepId, PlaybookExecutionLog.LogStatus.SUCCESS,
+                            "Condition evaluated: " + conditionResult);
+                    stepResults.put(stepId, conditionResult ? "SUCCESS" : "FAILED");
+
+                    // Follow the appropriate branch via edges
+                    List<PlaybookEdge> outEdges = adjacency.getOrDefault(stepId, List.of());
+                    List<String> nextSteps = new ArrayList<>();
+                    for (PlaybookEdge edge : outEdges) {
+                        boolean follow = false;
+                        if ("true".equalsIgnoreCase(edge.getEdgeLabel()) || "success".equalsIgnoreCase(edge.getEdgeLabel())) {
+                            follow = conditionResult;
+                        } else if ("false".equalsIgnoreCase(edge.getEdgeLabel()) || "failure".equalsIgnoreCase(edge.getEdgeLabel())) {
+                            follow = !conditionResult;
+                        } else {
+                            follow = true; // default/always edges
+                        }
+                        if (follow && !visited.contains(edge.getTargetStepId())) {
+                            nextSteps.add(edge.getTargetStepId());
+                        }
+                    }
+                    if (!nextSteps.isEmpty()) executionQueue.add(nextSteps);
+                    continue;
+                }
+
+                // Regular action step
+                try {
+                    String output = executeStep(step, companyId, srcIp);
+                    logStepResult(executionId, stepId, PlaybookExecutionLog.LogStatus.SUCCESS, output);
+                    stepResults.put(stepId, "SUCCESS");
+                } catch (Exception e) {
+                    log.error("SOAR: Step {} failed: {}", step.getActionType(), e.getMessage());
+                    logStepResult(executionId, stepId, PlaybookExecutionLog.LogStatus.FAILED, e.getMessage());
+                    stepResults.put(stepId, "FAILED");
+                }
+            }
+
+            // Determine next steps from edges of all executed steps in this batch
+            List<String> nextBatch = new ArrayList<>();
+            for (String stepId : currentBatch) {
+                if ("condition".equals(stepMap.containsKey(stepId) ? stepMap.get(stepId).getNodeType() : null)) {
+                    continue; // conditions already handled their own branching above
+                }
+                List<PlaybookEdge> outEdges = adjacency.getOrDefault(stepId, List.of());
+                for (PlaybookEdge edge : outEdges) {
+                    if (!visited.contains(edge.getTargetStepId())) {
+                        nextBatch.add(edge.getTargetStepId());
+                    }
+                }
+            }
+            if (!nextBatch.isEmpty()) executionQueue.add(nextBatch);
+        }
+
+        // Mark any unreachable steps as skipped
+        for (PlaybookStep step : steps) {
+            if (!visited.contains(step.getId())) {
+                logStepResult(executionId, step.getId(), PlaybookExecutionLog.LogStatus.SKIPPED, "Unreachable in graph");
+            }
+        }
+
+        boolean hasFailed = stepResults.values().stream().anyMatch("FAILED"::equals);
+        finalizeExecution(executionId, hasFailed);
+    }
+
+    private boolean evaluateCondition(PlaybookStep step, String companyId, String srcIp, Map<String, String> stepResults) {
+        String expr = step.getConditionExpression();
+        if (expr == null || expr.isBlank()) return true;
+
+        try {
+            JsonNode config = objectMapper.readTree(expr);
+            // Support JSON condition format: {"field": "severity", "operator": ">=", "value": 3}
+            if (config.has("field") && config.has("operator") && config.has("value")) {
+                String field = config.get("field").asText();
+                String operator = config.get("operator").asText();
+                String value = config.get("value").asText();
+
+                // Evaluate against execution context
+                if ("previous_step_success".equals(field)) {
+                    String prevStepId = value;
+                    return "SUCCESS".equals(stepResults.get(prevStepId));
+                }
+                if ("severity".equals(field)) {
+                    // Would be evaluated against trigger event context
+                    return true;
+                }
+                if ("src_ip_malicious".equals(field)) {
+                    return srcIp != null && !srcIp.isBlank();
+                }
+            }
+
+            // Simple expression: "true", "false"
+            return !"false".equalsIgnoreCase(expr.trim());
+        } catch (Exception e) {
+            log.warn("SOAR: Condition eval failed for step {}: {}", step.getId(), e.getMessage());
+            return !"false".equalsIgnoreCase(expr.trim());
+        }
+    }
+
+    private void finalizeExecution(String executionId, boolean failed) {
         PlaybookExecution execution = executionRepository.findById(executionId).orElse(null);
         if (execution != null) {
             execution.setStatus(failed ? PlaybookExecution.ExecutionStatus.FAILED : PlaybookExecution.ExecutionStatus.COMPLETED);
@@ -602,6 +903,8 @@ public class PlaybookService {
             case NOTIFY_SLACK -> executeNotifySlack(step, companyId);
             case UPDATE_STATUS -> "Status update executed";
             case WEBHOOK_CALL -> "Webhook call executed";
+            case CONDITION -> "Condition evaluated";
+            case DELAY -> "Delay completed";
         };
     }
 
@@ -619,13 +922,23 @@ public class PlaybookService {
             if (config.has("reason")) reason = config.get("reason").asText();
         } catch (Exception ignored) {}
 
-        BlockedIP blocked = new BlockedIP();
-        blocked.setIp(srcIp);
-        blocked.setCompanyId(companyId);
-        blocked.setReason(reason);
-        blocked.setBlockedAt(LocalDateTime.now());
-        blocked.setExpiresAt(LocalDateTime.now().plusHours(durationHours));
-        blockedIPRepository.save(blocked);
+        BlockedIPId id = new BlockedIPId();
+        id.setIp(srcIp);
+        id.setCompanyId(companyId);
+
+        if (!blockedIPRepository.existsById(id)) {
+            try {
+                BlockedIP blocked = new BlockedIP();
+                blocked.setIp(srcIp);
+                blocked.setCompanyId(companyId);
+                blocked.setReason(reason);
+                blocked.setBlockedAt(LocalDateTime.now());
+                blocked.setExpiresAt(LocalDateTime.now().plusHours(durationHours));
+                blockedIPRepository.save(blocked);
+            } catch (org.springframework.dao.DataIntegrityViolationException ignored) {
+                // IP already blocked by concurrent thread
+            }
+        }
 
         return "Blocked IP " + srcIp + " for " + durationHours + " hours";
     }

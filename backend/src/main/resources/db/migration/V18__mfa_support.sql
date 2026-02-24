@@ -1,0 +1,4 @@
+-- V18: MFA/TOTP support
+ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN mfa_secret VARCHAR(64);
+ALTER TABLE users ADD COLUMN mfa_recovery_codes TEXT;

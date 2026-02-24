@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 public class AuthDTOs {
 
     @Data
@@ -71,12 +73,35 @@ public class AuthDTOs {
         private String tokenType = "Bearer";
         private int expiresIn;
         private User user;
+        private boolean requiresMfa;
+        private String mfaToken;
+        private List<String> permissions;
 
         public AuthResponse(String accessToken, String refreshToken, int expiresIn, User user) {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
             this.expiresIn = expiresIn;
             this.user = user;
+            this.requiresMfa = false;
         }
+
+        public AuthResponse(String accessToken, String refreshToken, int expiresIn, User user, List<String> permissions) {
+            this(accessToken, refreshToken, expiresIn, user);
+            this.permissions = permissions;
+        }
+
+        /** MFA-pending response: no tokens, just mfaToken for second step */
+        public static AuthResponse mfaPending(String mfaToken) {
+            AuthResponse r = new AuthResponse(null, null, 0, null);
+            r.setRequiresMfa(true);
+            r.setMfaToken(mfaToken);
+            return r;
+        }
+    }
+
+    @Data
+    public static class MfaLoginRequest {
+        private String mfaToken;
+        private String code;
     }
 }

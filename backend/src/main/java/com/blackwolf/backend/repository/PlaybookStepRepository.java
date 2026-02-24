@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface PlaybookStepRepository extends JpaRepository<PlaybookStep, String> {
     List<PlaybookStep> findByPlaybookIdOrderByStepOrderAsc(String playbookId);
+    void deleteByPlaybookId(String playbookId);
 }

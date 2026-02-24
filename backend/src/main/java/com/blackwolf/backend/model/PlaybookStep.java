@@ -23,7 +23,28 @@ public class PlaybookStep {
     private String description;
     private LocalDateTime createdAt;
 
+    @Column(name = "position_x")
+    private Double positionX;
+
+    @Column(name = "position_y")
+    private Double positionY;
+
+    @Column(name = "node_type")
+    private String nodeType;
+
+    @Column(name = "condition_expression", columnDefinition = "TEXT")
+    private String conditionExpression;
+
+    @Column(name = "on_success_step_id")
+    private String onSuccessStepId;
+
+    @Column(name = "on_failure_step_id")
+    private String onFailureStepId;
+
+    @Column(name = "is_parallel")
+    private Boolean isParallel;
+
     public enum ActionType {
-        BLOCK_IP, CREATE_INCIDENT, SEND_ALERT, ENRICH_IP, UPDATE_STATUS, NOTIFY_SLACK, WEBHOOK_CALL
+        BLOCK_IP, CREATE_INCIDENT, SEND_ALERT, ENRICH_IP, UPDATE_STATUS, NOTIFY_SLACK, WEBHOOK_CALL, CONDITION, DELAY
     }
 }

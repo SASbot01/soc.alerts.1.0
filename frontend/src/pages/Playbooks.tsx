@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Plus, Zap, Clock, CheckCircle, XCircle, ChevronRight, ChevronDown, Shield, Download, Link2, Search } from 'lucide-react';
+import { Play, Pause, Plus, Zap, Clock, CheckCircle, XCircle, ChevronRight, ChevronDown, Shield, Download, Link2, Search, Workflow } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import Modal from '../components/Modal';
 
@@ -86,6 +87,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const Playbooks: React.FC = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'my' | 'templates' | 'executions'>('my');
     const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
     const [templates, setTemplates] = useState<PlaybookTemplate[]>([]);
@@ -305,16 +307,22 @@ const Playbooks: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
+                                        onClick={() => navigate(`/playbooks/${pb.id}/builder`)}
+                                        className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                                    >
+                                        <Workflow className="w-3 h-3" /> Builder
+                                    </button>
+                                    <button
                                         onClick={() => openAssignModal(pb.id, pb.name)}
                                         className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
                                     >
-                                        <Link2 className="w-3 h-3" /> Assign Assets
+                                        <Link2 className="w-3 h-3" /> Assign
                                     </button>
                                     <button
                                         onClick={() => executePlaybook(pb.id)}
                                         className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
                                     >
-                                        Run Now <ChevronRight className="w-3 h-3" />
+                                        Run <ChevronRight className="w-3 h-3" />
                                     </button>
                                 </div>
                             </div>

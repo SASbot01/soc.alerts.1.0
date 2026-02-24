@@ -7,6 +7,7 @@ import com.blackwolf.backend.service.PlaybookService;
 import com.blackwolf.backend.util.AuthUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,16 +25,19 @@ public class PlaybookController {
     private AuthUtils authUtils;
 
     @GetMapping
+    @PreAuthorize("@perm.has(authentication, 'playbooks:read')")
     public ResponseEntity<List<Playbook>> list(Authentication auth) {
         return ResponseEntity.ok(playbookService.listByCompany(authUtils.getCompanyId(auth)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@perm.has(authentication, 'playbooks:read')")
     public ResponseEntity<PlaybookDetailResponse> getDetail(Authentication auth, @PathVariable String id) {
         return ResponseEntity.ok(playbookService.getDetail(id, authUtils.getCompanyId(auth)));
     }
 
     @PostMapping
+    @PreAuthorize("@perm.has(authentication, 'playbooks:write')")
     public ResponseEntity<Playbook> create(Authentication auth, @RequestBody CreatePlaybookRequest request) {
         String companyId = authUtils.getCompanyId(auth);
         String performedBy = authUtils.getUser(auth).getEmail();
@@ -41,6 +45,7 @@ public class PlaybookController {
     }
 
     @PatchMapping("/{id}/toggle")
+    @PreAuthorize("@perm.has(authentication, 'playbooks:write')")
     public ResponseEntity<Playbook> toggleActive(Authentication auth, @PathVariable String id) {
         String companyId = authUtils.getCompanyId(auth);
         String performedBy = authUtils.getUser(auth).getEmail();
@@ -48,6 +53,7 @@ public class PlaybookController {
     }
 
     @PostMapping("/{id}/execute")
+    @PreAuthorize("@perm.has(authentication, 'playbooks:execute')")
     public ResponseEntity<PlaybookExecution> execute(Authentication auth, @PathVariable String id) {
         String companyId = authUtils.getCompanyId(auth);
         String performedBy = authUtils.getUser(auth).getEmail();
@@ -62,6 +68,22 @@ public class PlaybookController {
     @GetMapping("/executions/{id}")
     public ResponseEntity<ExecutionDetailResponse> getExecutionDetail(Authentication auth, @PathVariable String id) {
         return ResponseEntity.ok(playbookService.getExecutionDetail(id, authUtils.getCompanyId(auth)));
+    }
+
+    // ===== Visual Builder =====
+
+    @GetMapping("/{id}/graph")
+    @PreAuthorize("@perm.has(authentication, 'playbooks:read')")
+    public ResponseEntity<Map<String, Object>> getGraph(Authentication auth, @PathVariable String id) {
+        return ResponseEntity.ok(playbookService.getGraph(id, authUtils.getCompanyId(auth)));
+    }
+
+    @PutMapping("/{id}/graph")
+    @PreAuthorize("@perm.has(authentication, 'playbooks:write')")
+    public ResponseEntity<Map<String, Object>> saveGraph(Authentication auth, @PathVariable String id, @RequestBody Map<String, Object> graphData) {
+        String companyId = authUtils.getCompanyId(auth);
+        String performedBy = authUtils.getUser(auth).getEmail();
+        return ResponseEntity.ok(playbookService.saveGraph(id, companyId, graphData, performedBy));
     }
 
     // ===== Template Endpoints =====

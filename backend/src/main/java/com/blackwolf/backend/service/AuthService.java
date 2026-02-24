@@ -21,7 +21,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AuthService {
@@ -49,8 +53,17 @@ public class AuthService {
     @Autowired
     private RateLimitService rateLimitService;
 
+    @Autowired
+    private MfaService mfaService;
+
+    @Autowired
+    private RbacService rbacService;
+
     @Value("${jwt.expiration}")
     private int jwtExpirationInMs;
+
+    // Temporary store for MFA-pending tokens (userId -> mfaToken). In production use Redis.
+    private final Map<String, String> mfaPendingTokens = new ConcurrentHashMap<>();
 
     @Transactional
     public AuthResponse login(LoginRequest loginRequest, String ipAddress) {
@@ -87,6 +100,15 @@ public class AuthService {
                             user.getId(),
                             loginRequest.getPassword()));
 
+            // If MFA is enabled, return mfa-pending response
+            if (user.isMfaEnabled()) {
+                String mfaToken = UUID.randomUUID().toString();
+                mfaPendingTokens.put(mfaToken, user.getId());
+                rateLimitService.recordAttempt(identifier, ipAddress, LoginAttempt.AttemptType.LOGIN, true);
+                log.info("MFA required for user {} from IP {}", user.getEmail(), ipAddress);
+                return AuthResponse.mfaPending(mfaToken);
+            }
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = tokenProvider.generateToken(authentication);
 
@@ -102,7 +124,8 @@ public class AuthService {
 
             log.info("User {} logged in successfully from IP {}", user.getEmail(), ipAddress);
 
-            return new AuthResponse(jwt, refreshToken.getToken(), jwtExpirationInMs / 1000, user);
+            List<String> permissions = new ArrayList<>(rbacService.getPermissionsForRole(user.getRole(), user.getCompanyId()));
+            return new AuthResponse(jwt, refreshToken.getToken(), jwtExpirationInMs / 1000, user, permissions);
 
         } catch (Exception e) {
             // Record failed attempt
@@ -110,6 +133,36 @@ public class AuthService {
             log.warn("Failed login attempt for {} from IP {}", identifier, ipAddress);
             throw new RuntimeException("Invalid credentials");
         }
+    }
+
+    @Transactional
+    public AuthResponse verifyMfa(MfaLoginRequest mfaRequest, String ipAddress) {
+        String userId = mfaPendingTokens.remove(mfaRequest.getMfaToken());
+        if (userId == null) {
+            throw new RuntimeException("Invalid or expired MFA token");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!mfaService.validateCode(user, mfaRequest.getCode())) {
+            // Put the token back so user can retry
+            mfaPendingTokens.put(mfaRequest.getMfaToken(), userId);
+            throw new RuntimeException("Invalid MFA code");
+        }
+
+        // MFA verified — issue tokens
+        String role = "ROLE_" + user.getRole().toUpperCase();
+        String jwt = tokenProvider.generateTokenForUser(user.getId(), role);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId(), ipAddress);
+
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("MFA verified for user {} from IP {}", user.getEmail(), ipAddress);
+
+        List<String> permissions = new ArrayList<>(rbacService.getPermissionsForRole(user.getRole(), user.getCompanyId()));
+        return new AuthResponse(jwt, refreshToken.getToken(), jwtExpirationInMs / 1000, user, permissions);
     }
 
     @Transactional
@@ -131,7 +184,8 @@ public class AuthService {
         String role = "ROLE_" + user.getRole().toUpperCase();
         String jwt = tokenProvider.generateTokenForUser(user.getId(), role);
 
-        return new AuthResponse(jwt, newRefreshToken.getToken(), jwtExpirationInMs / 1000, user);
+        List<String> permissions = new ArrayList<>(rbacService.getPermissionsForRole(user.getRole(), user.getCompanyId()));
+        return new AuthResponse(jwt, newRefreshToken.getToken(), jwtExpirationInMs / 1000, user, permissions);
     }
 
     @Transactional

@@ -39,6 +39,8 @@ public class OnboardingRequest {
     private String alertSlackWebhook;
     private String preferredSla;
 
+    private String selectedPlan;
+
     private String status;
     private String reviewedBy;
     private LocalDateTime reviewedAt;

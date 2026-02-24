@@ -4,19 +4,18 @@ import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, ShieldAlert, Radio, LogOut, Settings, Menu,
     ClipboardCheck, Crosshair, Bug, Award, Users, Building2,
-    AlertCircle, Bell, FileText, Zap, Server, Grid3X3
+    AlertCircle, Bell, FileText, Zap, Server, Grid3X3, Brain, CreditCard, ShieldCheck, Plug, Search, FileCode,
+    Activity, ShoppingBag
 } from 'lucide-react';
 import clsx from 'clsx';
 import AiChatWidget from './AiChatWidget';
 
 const Layout: React.FC = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, hasPermission } = useAuth();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
     const isSuperAdmin = user?.role === 'superadmin';
-    const isAdmin = user?.role === 'admin';
-
     // Superadmin gets a different nav
     const superAdminNavItems = [
         { name: 'Global Overview', path: '/', icon: LayoutDashboard },
@@ -25,25 +24,33 @@ const Layout: React.FC = () => {
     ];
 
     const mainNavItems = [
-        { name: 'Overview', path: '/', icon: LayoutDashboard },
-        { name: 'Threats', path: '/threats', icon: ShieldAlert },
-        { name: 'Incidents', path: '/incidents', icon: AlertCircle },
-        { name: 'Playbooks', path: '/playbooks', icon: Zap },
-        { name: 'Assets', path: '/assets', icon: Server },
-        { name: 'Sensors', path: '/sensors', icon: Radio },
-        { name: 'Alerts', path: '/alerts', icon: Bell },
+        { name: 'Overview', path: '/', icon: LayoutDashboard, permission: 'dashboard:read' },
+        { name: 'Threats', path: '/threats', icon: ShieldAlert, permission: 'threats:read' },
+        { name: 'Incidents', path: '/incidents', icon: AlertCircle, permission: 'incidents:read' },
+        { name: 'Playbooks', path: '/playbooks', icon: Zap, permission: 'playbooks:read' },
+        { name: 'Assets', path: '/assets', icon: Server, permission: 'assets:read' },
+        { name: 'Sensors', path: '/sensors', icon: Radio, permission: 'sensors:read' },
+        { name: 'Alerts', path: '/alerts', icon: Bell, permission: 'alerts:read' },
+        { name: 'AI Agent', path: '/ai-decisions', icon: Brain, permission: 'ai_agent:read' },
+        { name: 'Threat Hunting', path: '/hunting', icon: Search, permission: 'threats:read' },
+        { name: 'SIGMA Rules', path: '/sigma', icon: FileCode, permission: 'threats:read' },
+        { name: 'UEBA', path: '/ueba', icon: Activity, permission: 'threats:read' },
     ];
 
     const socNavItems = [
-        { name: 'MITRE ATT&CK', path: '/mitre', icon: Grid3X3 },
-        { name: 'Audits', path: '/audits', icon: ClipboardCheck },
-        { name: 'Pentests', path: '/pentests', icon: Crosshair },
-        { name: 'Vulnerabilities', path: '/vulnerabilities', icon: Bug },
-        { name: 'Certifications', path: '/certifications', icon: Award },
+        { name: 'MITRE ATT&CK', path: '/mitre', icon: Grid3X3, permission: 'mitre:read' },
+        { name: 'Audits', path: '/audits', icon: ClipboardCheck, permission: 'audits:read' },
+        { name: 'Pentests', path: '/pentests', icon: Crosshair, permission: 'pentests:read' },
+        { name: 'Vulnerabilities', path: '/vulnerabilities', icon: Bug, permission: 'vulnerabilities:read' },
+        { name: 'Certifications', path: '/certifications', icon: Award, permission: 'certifications:read' },
     ];
 
     const adminNavItems = [
-        { name: 'Users', path: '/users', icon: Users },
+        { name: 'Users', path: '/users', icon: Users, permission: 'users:read' },
+        { name: 'Roles', path: '/roles', icon: ShieldCheck, permission: 'roles:read' },
+        { name: 'Integrations', path: '/integrations', icon: Plug, permission: 'integrations:read' },
+        { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag, permission: 'settings:read' },
+        { name: 'Billing', path: '/billing', icon: CreditCard, permission: 'billing:read' },
     ];
 
     const bottomNavItems = [
@@ -70,6 +77,14 @@ const Layout: React.FC = () => {
             <span className={clsx("font-medium", !sidebarOpen && "lg:hidden")}>{item.name}</span>
         </Link>
     );
+
+    const filterByPermission = (items: Array<{ name: string; path: string; icon: React.ComponentType<{ className?: string }>; permission?: string }>) => {
+        return items.filter(item => !item.permission || hasPermission(item.permission));
+    };
+
+    const filteredMainNav = filterByPermission(mainNavItems);
+    const filteredSocNav = filterByPermission(socNavItems);
+    const filteredAdminNav = filterByPermission(adminNavItems);
 
     return (
         <div className="flex h-screen bg-slate-900 text-slate-100 font-sans">
@@ -98,25 +113,29 @@ const Layout: React.FC = () => {
                         ) : (
                             <>
                                 {/* Main Navigation */}
-                                {mainNavItems.map(renderNavItem)}
+                                {filteredMainNav.map(renderNavItem)}
 
                                 {/* SOC Operations Section */}
-                                <div className="pt-4 pb-2">
-                                    <span className={clsx("px-4 text-[10px] font-bold uppercase tracking-widest text-slate-600", !sidebarOpen && "lg:hidden")}>
-                                        SOC Operations
-                                    </span>
-                                </div>
-                                {socNavItems.map(renderNavItem)}
+                                {filteredSocNav.length > 0 && (
+                                    <>
+                                        <div className="pt-4 pb-2">
+                                            <span className={clsx("px-4 text-[10px] font-bold uppercase tracking-widest text-slate-600", !sidebarOpen && "lg:hidden")}>
+                                                SOC Operations
+                                            </span>
+                                        </div>
+                                        {filteredSocNav.map(renderNavItem)}
+                                    </>
+                                )}
 
                                 {/* Admin Section */}
-                                {isAdmin && (
+                                {filteredAdminNav.length > 0 && (
                                     <>
                                         <div className="pt-4 pb-2">
                                             <span className={clsx("px-4 text-[10px] font-bold uppercase tracking-widest text-slate-600", !sidebarOpen && "lg:hidden")}>
                                                 Administration
                                             </span>
                                         </div>
-                                        {adminNavItems.map(renderNavItem)}
+                                        {filteredAdminNav.map(renderNavItem)}
                                     </>
                                 )}
                             </>

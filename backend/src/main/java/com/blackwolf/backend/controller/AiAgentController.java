@@ -71,6 +71,12 @@ public class AiAgentController {
         return ResponseEntity.ok(aiAutonomousAgentService.getDecisions(companyId, verdict));
     }
 
+    @GetMapping("/autonomous/token-stats")
+    public ResponseEntity<Map<String, Object>> getTokenStats(Authentication auth) {
+        String companyId = authUtils.getCompanyId(auth);
+        return ResponseEntity.ok(aiAutonomousAgentService.getTokenStats(companyId));
+    }
+
     // ===== Autonomous Agent - Noise Patterns =====
 
     @GetMapping("/autonomous/noise-patterns")
