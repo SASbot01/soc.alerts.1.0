@@ -30,6 +30,11 @@ class Messenger:
 
         for conv in conversations:
             try:
+                # Guard against non-dict entries (API sometimes returns strings on error)
+                if not isinstance(conv, dict):
+                    logger.debug("Skipping non-dict conversation entry: %s", type(conv))
+                    continue
+
                 participants = conv.get("participants", [])
                 conv_id = conv.get("entityUrn", "")
 
@@ -51,7 +56,11 @@ class Messenger:
                 first_name = ""
                 company = ""
                 for p in participants:
+                    if not isinstance(p, dict):
+                        continue
                     profile = p.get("com.linkedin.voyager.messaging.MessagingMember", {})
+                    if not isinstance(profile, dict):
+                        continue
                     mini_profile = profile.get("miniProfile", {})
                     first_name = mini_profile.get("firstName", "there")
                     occupation = mini_profile.get("occupation", "")

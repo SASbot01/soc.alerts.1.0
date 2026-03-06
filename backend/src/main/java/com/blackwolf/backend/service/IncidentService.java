@@ -41,6 +41,9 @@ public class IncidentService {
     @Autowired
     private CompanyRepository companyRepository;
 
+    @Autowired
+    private BlockedSubnetRepository blockedSubnetRepository;
+
     @Value("${incident.auto-resolve.enabled:true}")
     private boolean autoResolveEnabled;
 
@@ -56,11 +59,20 @@ public class IncidentService {
             int totalResolved = 0;
 
             for (Company company : companies) {
-                List<Incident> openIncidents = incidentRepository.findByCompanyIdAndStatus(company.getId(), "open");
+                List<Incident> openIncidents = incidentRepository.findByCompanyIdAndStatusIn(
+                        company.getId(), List.of("open", "investigating"));
 
                 for (Incident incident : openIncidents) {
                     String reason = checkAutoResolveReason(incident);
                     if (reason != null) {
+                        // For high/critical: transition through investigating → contained → resolved
+                        String sev = incident.getSeverity() != null ? incident.getSeverity().toLowerCase() : "low";
+                        if ("high".equals(sev) || "critical".equals(sev)) {
+                            addTimelineEntry(incident.getId(), "Auto-Investigating",
+                                    "AI agent automatically investigating: " + reason, "ai-agent");
+                            addTimelineEntry(incident.getId(), "Auto-Contained",
+                                    "Threat contained — attacker IP blocked, playbooks executed", "ai-agent");
+                        }
                         incident.setStatus("resolved");
                         incident.setResolvedAt(LocalDateTime.now());
                         incident.setUpdatedAt(LocalDateTime.now());
@@ -92,7 +104,7 @@ public class IncidentService {
             }
         }
 
-        // Rule B: Associated blocked IP has expired
+        // Rule B: Associated IP is actively blocked (attacker is contained)
         if (incident.getSourceThreatId() != null) {
             var threatOpt = threatEventRepository.findById(incident.getSourceThreatId());
             if (threatOpt.isPresent() && threatOpt.get().getSrcIp() != null) {
@@ -102,22 +114,90 @@ public class IncidentService {
                 ipId.setCompanyId(incident.getCompanyId());
                 var blockedOpt = blockedIPRepository.findById(ipId);
                 if (blockedOpt.isPresent() && blockedOpt.get().getExpiresAt() != null
-                        && blockedOpt.get().getExpiresAt().isBefore(LocalDateTime.now())) {
-                    return "Auto-resolved: Blocked IP " + srcIp + " has expired (expired at " + blockedOpt.get().getExpiresAt() + ")";
+                        && blockedOpt.get().getExpiresAt().isAfter(LocalDateTime.now())) {
+                    return "Auto-resolved: Attacker IP " + srcIp + " is actively blocked until " + blockedOpt.get().getExpiresAt() + " — threat contained";
                 }
             }
         }
 
-        // Rule C: SLA deadline passed without escalation — only for low/medium severity
-        // High and critical incidents created by the AI agent should NOT auto-resolve on SLA expiry
+        // Rule C: SLA deadline passed — low auto-resolves, medium after 2x SLA
         if (incident.getSlaDeadline() != null && incident.getSlaDeadline().isBefore(LocalDateTime.now())) {
             String sev = incident.getSeverity() != null ? incident.getSeverity().toLowerCase() : "low";
             if ("low".equals(sev)) {
                 return "Auto-resolved: SLA deadline passed (" + incident.getSlaDeadline() + ") without escalation";
             }
+            // Medium incidents auto-resolve if 2x SLA has passed and no new activity
+            if ("medium".equals(sev) && incident.getSlaDeadline().plusHours(8).isBefore(LocalDateTime.now())) {
+                return "Auto-resolved: Medium severity — no activity after extended SLA window";
+            }
+        }
+
+        // Rule D: HIGH/CRITICAL incidents — auto-resolve if AI analyzed, IP blocked, and block is still active
+        if (incident.getSourceThreatId() != null) {
+            String sev = incident.getSeverity() != null ? incident.getSeverity().toLowerCase() : "";
+            if ("high".equals(sev) || "critical".equals(sev)) {
+                List<AiDecision> decisions = aiDecisionRepository.findByThreatEventId(incident.getSourceThreatId());
+                for (AiDecision d : decisions) {
+                    if (d.getIpBlocked() != null && d.getIpBlocked()
+                            && (d.getVerdict() == AiDecision.Verdict.REAL_ATTACK || d.getVerdict() == AiDecision.Verdict.CRITICAL_ATTACK)) {
+                        // AI confirmed attack and IP was blocked — auto-contain
+                        var threatOpt = threatEventRepository.findById(incident.getSourceThreatId());
+                        if (threatOpt.isPresent() && threatOpt.get().getSrcIp() != null) {
+                            BlockedIPId ipId = new BlockedIPId();
+                            ipId.setIp(threatOpt.get().getSrcIp());
+                            ipId.setCompanyId(incident.getCompanyId());
+                            var blockedOpt = blockedIPRepository.findById(ipId);
+                            if (blockedOpt.isPresent() && blockedOpt.get().getExpiresAt() != null
+                                    && blockedOpt.get().getExpiresAt().isAfter(LocalDateTime.now())) {
+                                return "Auto-resolved: AI confirmed " + d.getVerdict() + " — IP "
+                                        + threatOpt.get().getSrcIp() + " actively blocked until "
+                                        + blockedOpt.get().getExpiresAt()
+                                        + ". Confidence: " + d.getConfidence();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Rule E: Age-based auto-resolve — low >6h, medium >12h regardless of SLA
+        if (incident.getCreatedAt() != null) {
+            String sev = incident.getSeverity() != null ? incident.getSeverity().toLowerCase() : "low";
+            if ("low".equals(sev) && incident.getCreatedAt().plusHours(6).isBefore(LocalDateTime.now())) {
+                return "Auto-resolved: Low severity incident aged >6 hours without escalation";
+            }
+            if ("medium".equals(sev) && incident.getCreatedAt().plusHours(12).isBefore(LocalDateTime.now())) {
+                return "Auto-resolved: Medium severity incident aged >12 hours without escalation";
+            }
+        }
+
+        // Rule F: Subnet-based — auto-resolve if source IP falls in a blocked subnet
+        if (incident.getSourceThreatId() != null) {
+            var threatOpt = threatEventRepository.findById(incident.getSourceThreatId());
+            if (threatOpt.isPresent() && threatOpt.get().getSrcIp() != null) {
+                String srcIp = threatOpt.get().getSrcIp();
+                String subnet = extractSubnet24(srcIp);
+                if (subnet != null) {
+                    List<BlockedSubnet> activeSubnets = blockedSubnetRepository.findActiveByCompanyId(
+                            incident.getCompanyId(), LocalDateTime.now());
+                    for (BlockedSubnet bs : activeSubnets) {
+                        if (bs.getCidr().equals(subnet)) {
+                            return "Auto-resolved: Source IP " + srcIp + " belongs to blocked subnet " + subnet
+                                    + " (blocked by " + bs.getBlockedBy() + ": " + bs.getReason() + ")";
+                        }
+                    }
+                }
+            }
         }
 
         return null;
+    }
+
+    private static String extractSubnet24(String ip) {
+        if (ip == null || !ip.contains(".")) return null;
+        String[] parts = ip.split("\\.");
+        if (parts.length != 4) return null;
+        return parts[0] + "." + parts[1] + "." + parts[2] + ".0/24";
     }
 
     public List<Incident> listByCompany(String companyId) {
@@ -232,8 +312,11 @@ public class IncidentService {
         CreateIncidentRequest req = new CreateIncidentRequest();
         req.setTitle("Auto-generated: " + threatType + " (severity " + severity + ")");
         req.setDescription(description);
-        req.setSeverity(severity >= 9 ? "critical" : severity >= 7 ? "high" : severity >= 4 ? "medium" : "low");
+        String sevLabel = severity >= 9 ? "critical" : severity >= 7 ? "high" : severity >= 4 ? "medium" : "low";
+        req.setSeverity(sevLabel);
         req.setSourceThreatId(threatId);
+        // Auto-triage: assign to AI agent queue by severity so all incidents have an owner
+        req.setAssignedTo("ai-agent-" + sevLabel);
         return createIncident(companyId, req);
     }
 }

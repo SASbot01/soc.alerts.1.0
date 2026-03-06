@@ -41,6 +41,7 @@ public class AiAutonomousAgentService {
     @Autowired private ThreatEventRepository threatEventRepository;
     @Autowired private IncidentService incidentService;
     @Autowired private BlockedIPRepository blockedIPRepository;
+    @Autowired private BlockedSubnetRepository blockedSubnetRepository;
     @Autowired private PlaybookService playbookService;
     @Autowired private AlertService alertService;
     @Autowired private ThreatEnrichmentRepository enrichmentRepository;
@@ -365,6 +366,22 @@ public class AiAutonomousAgentService {
                         incidentService.addTimelineEntry(incident.getId(), "AI Analysis",
                                 "Verdict: " + analysis.verdict + " | Confidence: " + Math.round(analysis.confidence * 100) + "%\nReasoning: " + analysis.reasoning, "ai-agent");
 
+                        // Add defensive recommendations to timeline for self-improvement
+                        if (!analysis.defensiveRecommendations.isEmpty()) {
+                            StringBuilder defRecs = new StringBuilder("Defensive recommendations:\n");
+                            for (String rec : analysis.defensiveRecommendations) {
+                                defRecs.append("  - ").append(rec).append("\n");
+                            }
+                            if (!analysis.mitreTechniques.isEmpty()) {
+                                defRecs.append("MITRE ATT&CK: ").append(String.join(", ", analysis.mitreTechniques));
+                            }
+                            incidentService.addTimelineEntry(incident.getId(), "Defensive Recommendations",
+                                    defRecs.toString(), "ai-agent");
+                            actionsExecuted.add("defensive_recommendations_added");
+                            sseService.emitAiAgentLog(companyId, "INFO",
+                                    "DEFENSE_IMPROVED", "AI generated " + analysis.defensiveRecommendations.size() + " defensive recommendations for attack from " + threat.getSrcIp());
+                        }
+
                         alertService.fireAlertsForIncident(companyId, incident.getId(),
                                 incident.getTitle(), incident.getSeverity());
                         actionsExecuted.add("alerts_fired");
@@ -390,6 +407,22 @@ public class AiAutonomousAgentService {
                     if (decision.getIncidentCreatedId() != null) {
                         incidentService.addTimelineEntry(decision.getIncidentCreatedId(), "IP Blocked",
                                 "Blocked IP " + threat.getSrcIp() + " for 48 hours. Reason: Real attack detected - " + threat.getThreatType(), "ai-agent");
+                    }
+
+                    // Subnet escalation: if ≥3 IPs from same /24 are blocked, block the entire subnet
+                    try {
+                        boolean subnetBlocked = checkAndBlockSubnet(companyId, threat.getSrcIp(), 3, 72, "REAL_ATTACK");
+                        if (subnetBlocked) {
+                            actionsExecuted.add("subnet_blocked:" + extractSubnet24(threat.getSrcIp()));
+                            sseService.emitAiAgentLog(companyId, "ERROR",
+                                    "SUBNET_BLOCKED", "Subnet " + extractSubnet24(threat.getSrcIp()) + " blocked for 72h — coordinated attack detected");
+                            if (decision.getIncidentCreatedId() != null) {
+                                incidentService.addTimelineEntry(decision.getIncidentCreatedId(), "Subnet Blocked",
+                                        "Blocked subnet " + extractSubnet24(threat.getSrcIp()) + " for 72 hours — 3+ IPs from same /24 confirmed as attackers", "ai-agent");
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("AI Agent: Subnet escalation failed: {}", e.getMessage());
                     }
                 }
 
@@ -428,6 +461,22 @@ public class AiAutonomousAgentService {
                         incidentService.addTimelineEntry(incident.getId(), "AI Analysis",
                                 "Verdict: CRITICAL_ATTACK | Confidence: " + Math.round(analysis.confidence * 100) + "%\nReasoning: " + analysis.reasoning, "ai-agent");
 
+                        // Add defensive recommendations for critical attacks
+                        if (!analysis.defensiveRecommendations.isEmpty()) {
+                            StringBuilder defRecs = new StringBuilder("CRITICAL — Defensive recommendations:\n");
+                            for (String rec : analysis.defensiveRecommendations) {
+                                defRecs.append("  - ").append(rec).append("\n");
+                            }
+                            if (!analysis.mitreTechniques.isEmpty()) {
+                                defRecs.append("MITRE ATT&CK: ").append(String.join(", ", analysis.mitreTechniques));
+                            }
+                            incidentService.addTimelineEntry(incident.getId(), "Defensive Recommendations",
+                                    defRecs.toString(), "ai-agent");
+                            actionsExecuted.add("critical_defensive_recommendations_added");
+                            sseService.emitAiAgentLog(companyId, "CRITICAL",
+                                    "DEFENSE_IMPROVED", "AI generated " + analysis.defensiveRecommendations.size() + " critical defensive recommendations");
+                        }
+
                         alertService.fireAlertsForIncident(companyId, incident.getId(),
                                 incident.getTitle(), "critical");
                         actionsExecuted.add("critical_alerts_fired");
@@ -453,6 +502,22 @@ public class AiAutonomousAgentService {
                     if (decision.getIncidentCreatedId() != null) {
                         incidentService.addTimelineEntry(decision.getIncidentCreatedId(), "IP Blocked",
                                 "Blocked IP " + threat.getSrcIp() + " for 7 days. Reason: CRITICAL ATTACK - " + threat.getThreatType(), "ai-agent");
+                    }
+
+                    // Subnet escalation (critical): lower threshold of ≥2 IPs, block for 7 days
+                    try {
+                        boolean subnetBlocked = checkAndBlockSubnet(companyId, threat.getSrcIp(), 2, 168, "CRITICAL_ATTACK");
+                        if (subnetBlocked) {
+                            actionsExecuted.add("subnet_blocked_7days:" + extractSubnet24(threat.getSrcIp()));
+                            sseService.emitAiAgentLog(companyId, "CRITICAL",
+                                    "SUBNET_BLOCKED", "Subnet " + extractSubnet24(threat.getSrcIp()) + " blocked for 7 DAYS — critical coordinated attack");
+                            if (decision.getIncidentCreatedId() != null) {
+                                incidentService.addTimelineEntry(decision.getIncidentCreatedId(), "Subnet Blocked",
+                                        "Blocked subnet " + extractSubnet24(threat.getSrcIp()) + " for 7 days — 2+ IPs from same /24 in critical attack", "ai-agent");
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("AI Agent: Critical subnet escalation failed: {}", e.getMessage());
                     }
                 }
 
@@ -677,13 +742,20 @@ public class AiAutonomousAgentService {
                 6. Cualquier indicio de shell reverse, webshell, o exfiltración = CRITICAL_ATTACK
                 7. La IP origen, país, ISP y historial de abuso son factores importantes
 
+                Además de tu veredicto, para ataques SUSPICIOUS, REAL_ATTACK y CRITICAL_ATTACK debes incluir \
+                recomendaciones defensivas específicas en el campo "defensive_recommendations" para que el SOC se \
+                auto-mejore con cada ataque. Ejemplos: nuevas reglas Suricata, ajustes de firewall, \
+                patrones a monitorear, técnicas MITRE ATT&CK detectadas, etc.
+
                 Formato de respuesta para UN threat:
                 ```json
                 {
                   "threat_id": "el-id-del-threat",
                   "verdict": "NOISE|FALSE_POSITIVE|LEGITIMATE_SCAN|SUSPICIOUS|REAL_ATTACK|CRITICAL_ATTACK",
                   "confidence": 0.85,
-                  "reasoning": "Explicación concisa de por qué esta decisión"
+                  "reasoning": "Explicación concisa de por qué esta decisión",
+                  "defensive_recommendations": ["Recomendación 1", "Recomendación 2"],
+                  "mitre_techniques": ["T1190", "T1059"]
                 }
                 ```
 
@@ -695,13 +767,17 @@ public class AiAutonomousAgentService {
                       "threat_id": "id-1",
                       "verdict": "NOISE",
                       "confidence": 0.90,
-                      "reasoning": "..."
+                      "reasoning": "...",
+                      "defensive_recommendations": [],
+                      "mitre_techniques": []
                     },
                     {
                       "threat_id": "id-2",
                       "verdict": "REAL_ATTACK",
                       "confidence": 0.75,
-                      "reasoning": "..."
+                      "reasoning": "...",
+                      "defensive_recommendations": ["Block CIDR range /24", "Add Suricata rule for pattern X"],
+                      "mitre_techniques": ["T1190"]
                     }
                   ]
                 }
@@ -821,6 +897,16 @@ public class AiAutonomousAgentService {
             analysis.verdict = AiDecision.Verdict.valueOf(root.get("verdict").asText().toUpperCase());
             analysis.confidence = root.get("confidence").asDouble();
             analysis.reasoning = root.get("reasoning").asText();
+            if (root.has("defensive_recommendations") && root.get("defensive_recommendations").isArray()) {
+                for (JsonNode rec : root.get("defensive_recommendations")) {
+                    analysis.defensiveRecommendations.add(rec.asText());
+                }
+            }
+            if (root.has("mitre_techniques") && root.get("mitre_techniques").isArray()) {
+                for (JsonNode tech : root.get("mitre_techniques")) {
+                    analysis.mitreTechniques.add(tech.asText());
+                }
+            }
             return analysis;
         } catch (Exception e) {
             log.warn("AI Agent: Failed to parse AI response, defaulting to SUSPICIOUS: {}", e.getMessage());
@@ -850,6 +936,16 @@ public class AiAutonomousAgentService {
                     analysis.verdict = AiDecision.Verdict.valueOf(node.get("verdict").asText().toUpperCase());
                     analysis.confidence = node.get("confidence").asDouble();
                     analysis.reasoning = node.get("reasoning").asText();
+                    if (node.has("defensive_recommendations") && node.get("defensive_recommendations").isArray()) {
+                        for (JsonNode rec : node.get("defensive_recommendations")) {
+                            analysis.defensiveRecommendations.add(rec.asText());
+                        }
+                    }
+                    if (node.has("mitre_techniques") && node.get("mitre_techniques").isArray()) {
+                        for (JsonNode tech : node.get("mitre_techniques")) {
+                            analysis.mitreTechniques.add(tech.asText());
+                        }
+                    }
                     results.add(analysis);
                 }
             }
@@ -954,6 +1050,51 @@ public class AiAutonomousAgentService {
         } catch (Exception e) {
             log.error("AI Agent: Failed to block IP {}: {}", ip, e.getMessage());
         }
+    }
+
+    private boolean checkAndBlockSubnet(String companyId, String srcIp, int threshold, int hours, String reason) {
+        String subnet = extractSubnet24(srcIp);
+        if (subnet == null) return false;
+        if (blockedSubnetRepository.existsByCompanyIdAndCidr(companyId, subnet)) return false;
+
+        List<BlockedIP> activeIPs = blockedIPRepository.findActiveByCompanyId(companyId, LocalDateTime.now());
+        long sameSubnetCount = activeIPs.stream()
+                .filter(b -> subnet.equals(extractSubnet24(b.getIp())))
+                .count();
+
+        if (sameSubnetCount >= threshold) {
+            blockSubnet(companyId, subnet,
+                    "AI Agent: " + reason + " — " + sameSubnetCount + " IPs from " + subnet + " blocked", hours);
+            return true;
+        }
+        return false;
+    }
+
+    private void blockSubnet(String companyId, String cidr, String reason, int hours) {
+        try {
+            if (blockedSubnetRepository.existsByCompanyIdAndCidr(companyId, cidr)) return;
+
+            BlockedSubnet bs = new BlockedSubnet();
+            bs.setCidr(cidr);
+            bs.setCompanyId(companyId);
+            bs.setReason(reason);
+            bs.setBlockedAt(LocalDateTime.now());
+            bs.setExpiresAt(LocalDateTime.now().plusHours(hours));
+            bs.setBlockedBy("ai-agent");
+            blockedSubnetRepository.save(bs);
+            log.info("AI Agent: Blocked subnet {} for {} hours - {}", cidr, hours, reason);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.debug("AI Agent: Subnet {} already blocked for company {}", cidr, companyId);
+        } catch (Exception e) {
+            log.error("AI Agent: Failed to block subnet {}: {}", cidr, e.getMessage());
+        }
+    }
+
+    private static String extractSubnet24(String ip) {
+        if (ip == null || !ip.contains(".")) return null;
+        String[] parts = ip.split("\\.");
+        if (parts.length != 4) return null;
+        return parts[0] + "." + parts[1] + "." + parts[2] + ".0/24";
     }
 
     private boolean isActionableVerdict(AiDecision.Verdict verdict) {
@@ -1095,5 +1236,7 @@ public class AiAutonomousAgentService {
         AiDecision.Verdict verdict;
         double confidence;
         String reasoning;
+        List<String> defensiveRecommendations = new ArrayList<>();
+        List<String> mitreTechniques = new ArrayList<>();
     }
 }

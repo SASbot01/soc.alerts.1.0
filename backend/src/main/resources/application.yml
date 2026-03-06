@@ -108,17 +108,26 @@ ai:
     autonomous:
       enabled: ${AI_AUTONOMOUS_ENABLED:true}
       max-tokens: ${AI_AUTONOMOUS_MAX_TOKENS:4096}
-      batch-interval-ms: ${AI_AUTONOMOUS_BATCH_INTERVAL_MS:120000}
-      critical-threshold: ${AI_AUTONOMOUS_CRITICAL_THRESHOLD:8}
+      batch-interval-ms: ${AI_AUTONOMOUS_BATCH_INTERVAL_MS:60000}
+      critical-threshold: ${AI_AUTONOMOUS_CRITICAL_THRESHOLD:7}
       auto-block: ${AI_AUTONOMOUS_AUTO_BLOCK:true}
       auto-incident: ${AI_AUTONOMOUS_AUTO_INCIDENT:true}
       noise-learning: ${AI_AUTONOMOUS_NOISE_LEARNING:true}
+    evolution:
+      enabled: ${AI_EVOLUTION_ENABLED:true}
+      study-interval-ms: ${AI_EVOLUTION_STUDY_INTERVAL_MS:1800000}
+      max-studies-per-cycle: ${AI_EVOLUTION_MAX_STUDIES:5}
+      study-lookback-days: ${AI_EVOLUTION_LOOKBACK_DAYS:7}
+      daily-cron: ${AI_EVOLUTION_DAILY_CRON:0 0 0 * * *}
+      weekly-cron: ${AI_EVOLUTION_WEEKLY_CRON:0 0 1 * * MON}
+      study-max-tokens: ${AI_EVOLUTION_STUDY_MAX_TOKENS:6144}
+      summary-max-tokens: ${AI_EVOLUTION_SUMMARY_MAX_TOKENS:4096}
 
 # Incident auto-resolve
 incident:
   auto-resolve:
     enabled: ${INCIDENT_AUTO_RESOLVE_ENABLED:true}
-    interval-ms: ${INCIDENT_AUTO_RESOLVE_INTERVAL_MS:600000}
+    interval-ms: ${INCIDENT_AUTO_RESOLVE_INTERVAL_MS:180000}
 
 # Stripe Billing
 stripe:
@@ -142,6 +151,14 @@ spring.elasticsearch:
 # LinkedIn Prospector Bot
 prospector:
   api-key: ${PROSPECTOR_API_KEY:}
+  bot-url: ${PROSPECTOR_BOT_URL:http://linkedin-prospector:8000}
+
+# LDAP (lldap)
+ldap:
+  url: ${LDAP_URL:http://lldap:17170}
+  admin-user: ${LDAP_ADMIN_USER:admin}
+  admin-password: ${LDAP_ADMIN_PASSWORD:admin}
+  base-dn: ${LDAP_BASE_DN:dc=blackwolf,dc=io}
 
 # Maintenance tasks
 maintenance:

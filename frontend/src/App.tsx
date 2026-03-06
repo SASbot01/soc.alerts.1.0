@@ -34,6 +34,9 @@ import ThreatHunting from './pages/ThreatHunting';
 import SigmaRules from './pages/SigmaRules';
 import Ueba from './pages/Ueba';
 import Marketplace from './pages/Marketplace';
+import BotDashboard from './pages/BotDashboard';
+import AiEvolution from './pages/AiEvolution';
+import Infrastructure from './pages/Infrastructure';
 import Layout from './components/Layout';
 import NotificationToast from './components/NotificationToast';
 import { useAuth } from './context/AuthContext';
@@ -68,6 +71,7 @@ const App: React.FC = () => {
         <Route path="incidents/:id" element={<IncidentDetail />} />
         <Route path="alerts" element={<AlertConfig />} />
         <Route path="ai-decisions" element={<AiDecisions />} />
+        <Route path="ai-evolution" element={<AiEvolution />} />
         <Route path="audits" element={<Audits />} />
         <Route path="audits/:id" element={<AuditDetail />} />
         <Route path="pentests" element={<Pentests />} />
@@ -82,6 +86,7 @@ const App: React.FC = () => {
         <Route path="hunting" element={<ThreatHunting />} />
         <Route path="sigma" element={<SigmaRules />} />
         <Route path="ueba" element={<Ueba />} />
+        <Route path="infrastructure" element={<Infrastructure />} />
         <Route path="marketplace" element={<Marketplace />} />
         <Route path="integrations" element={<Integrations />} />
         <Route path="billing" element={<Billing />} />
@@ -91,6 +96,7 @@ const App: React.FC = () => {
         <Route path="superadmin/companies" element={<Companies />} />
         <Route path="superadmin/company/:id" element={<CompanyDetail />} />
         <Route path="superadmin/onboarding" element={<OnboardingRequests />} />
+        <Route path="superadmin/bot" element={<BotDashboard />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -13,6 +13,7 @@ interface MitreTechnique {
 
 const TACTICS = [
   'Reconnaissance',
+  'Resource Development',
   'Initial Access',
   'Execution',
   'Persistence',

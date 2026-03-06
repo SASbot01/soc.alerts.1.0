@@ -3,6 +3,7 @@ package com.blackwolf.backend.service;
 import com.blackwolf.backend.dto.AlertDTOs.*;
 import com.blackwolf.backend.model.AlertConfiguration;
 import com.blackwolf.backend.model.AlertHistory;
+import com.blackwolf.backend.model.BackupStatus;
 import com.blackwolf.backend.model.Company;
 import com.blackwolf.backend.model.ThreatEvent;
 import com.blackwolf.backend.repository.AlertConfigurationRepository;
@@ -116,8 +117,23 @@ public class AlertService {
         // Consolidated reports are sent every 6 hours by AiThreatAnalystService.
     }
 
-    // Fire alerts for an incident
+    // Fire alerts for an incident (rate-limited + severity-filtered)
     public void fireAlertsForIncident(String companyId, String incidentId, String title, String severity) {
+        // Only fire immediate alerts for critical/high incidents; skip medium/low to reduce noise
+        if (!"critical".equals(severity) && !"high".equals(severity)) {
+            log.debug("Skipping immediate alert for {} severity incident {}", severity, incidentId);
+            return;
+        }
+
+        // Rate limiting: max 20 alerts per company per hour
+        long recentAlertCount = historyRepository.countByCompanyIdAndSentAtAfter(
+                companyId, LocalDateTime.now().minusHours(1));
+        if (recentAlertCount >= 20) {
+            log.warn("Alert rate limit reached for company {} ({} alerts in last hour), skipping alert for incident {}",
+                    companyId, recentAlertCount, incidentId);
+            return;
+        }
+
         String companyName = getCompanyName(companyId);
 
         // Per-company alerts
@@ -146,9 +162,6 @@ public class AlertService {
                 }
             }
         }
-
-        // Global Slack per-event alerts disabled.
-        // Consolidated reports are sent every 6 hours by AiThreatAnalystService.
     }
 
     private void sendEmail(String to, String subject, String body) {
@@ -267,6 +280,67 @@ public class AlertService {
             log.info("Global Slack incident alert sent for {}", companyName);
         } catch (Exception e) {
             log.error("Global Slack incident alert failed: {}", e.getMessage());
+        }
+    }
+
+    // Fire alert for backup failure/stale
+    public void sendBackupFailureAlert(BackupStatus backup) {
+        String companyName = getCompanyName(backup.getCompanyId());
+
+        String subject = "[BlackWolf SOC] BACKUP " + backup.getStatus() + ": " + backup.getJobName() + " on " + backup.getClientHost();
+        String message = String.format("""
+                Backup Alert
+                ─────────────────────────
+                Host: %s
+                Job: %s
+                Status: %s
+                Type: %s
+                Target: %s
+                Error: %s
+                Time: %s
+                ─────────────────────────
+                BlackWolf SOC - Backup Monitor
+                """,
+                backup.getClientHost(), backup.getJobName(), backup.getStatus(),
+                backup.getBackupType(), backup.getTarget(),
+                backup.getErrorMessage() != null ? backup.getErrorMessage() : "N/A",
+                backup.getReportedAt());
+
+        // Per-company alerts (severity 9 for backup failures)
+        List<AlertConfiguration> configs = configRepository.findByCompanyIdAndIsActiveTrue(backup.getCompanyId());
+        for (AlertConfiguration config : configs) {
+            if (9 >= config.getMinSeverity()) {
+                try {
+                    switch (config.getAlertType()) {
+                        case "email" -> sendEmail(config.getDestination(), subject, message);
+                        case "slack" -> sendSlack(config.getDestination(), subject, message);
+                    }
+                    saveHistory(backup.getCompanyId(), config, null, null, subject, message, "sent");
+                } catch (Exception e) {
+                    log.error("Failed to send backup alert: {}", e.getMessage());
+                    saveHistory(backup.getCompanyId(), config, null, null, subject, message, "failed");
+                }
+            }
+        }
+
+        // Global Slack
+        if (globalSlackEnabled && globalSlackWebhook != null && !globalSlackWebhook.isBlank()) {
+            String emoji = "FAILED".equals(backup.getStatus()) ? ":red_circle:" : ":warning:";
+            String text = String.format("""
+                    %s *BACKUP %s*
+                    *Company:* %s
+                    *Host:* `%s`
+                    *Job:* %s
+                    *Error:* %s""",
+                    emoji, backup.getStatus(), companyName,
+                    backup.getClientHost(), backup.getJobName(),
+                    backup.getErrorMessage() != null ? backup.getErrorMessage() : "N/A");
+            try {
+                Map<String, String> payload = Map.of("text", text);
+                restTemplate.postForEntity(globalSlackWebhook, payload, String.class);
+            } catch (Exception e) {
+                log.error("Global Slack backup alert failed: {}", e.getMessage());
+            }
         }
     }
 

@@ -2,6 +2,8 @@
 Safe LinkedIn wrapper with rate limiting, working-hours enforcement, and acceptance tracking.
 """
 
+import json
+import os
 import time
 import random
 import logging
@@ -29,17 +31,98 @@ class LinkedInClient:
         self._total_sent = 0
         self._total_accepted = 0
 
-    def login(self):
+    def login(self, max_retries=3):
         if not config.LINKEDIN_EMAIL or not config.LINKEDIN_PASSWORD:
             logger.warning("LinkedIn credentials not configured, running in dry-run mode")
             return False
-        try:
-            self._api = Linkedin(config.LINKEDIN_EMAIL, config.LINKEDIN_PASSWORD)
-            logger.info("LinkedIn login successful for %s", config.LINKEDIN_EMAIL)
-            return True
-        except Exception as e:
-            logger.error("LinkedIn login failed: %s", e)
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                self._api = Linkedin(config.LINKEDIN_EMAIL, config.LINKEDIN_PASSWORD)
+                logger.info("LinkedIn login successful for %s", config.LINKEDIN_EMAIL)
+                return True
+            except Exception as e:
+                logger.error("LinkedIn login attempt %d/%d failed: %s", attempt, max_retries, e)
+                if attempt < max_retries:
+                    time.sleep(5)
+
+        logger.warning("All password login attempts failed — trying cookie fallback")
+        return self._login_with_cookies()
+
+    def _login_with_cookies(self) -> bool:
+        """Fallback login using exported browser cookies."""
+        cookie_path = config.LINKEDIN_COOKIES_PATH
+        if not os.path.exists(cookie_path):
+            logger.warning("No cookie file at %s — cannot fallback", cookie_path)
             return False
+        try:
+            with open(cookie_path) as f:
+                cookies = json.load(f)
+
+            from linkedin_api.client import Client
+
+            # Create a Linkedin instance without triggering login
+            li = Linkedin.__new__(Linkedin)
+            li.client = Client()
+            li.logger = logging.getLogger("linkedin_api")
+            li.client.metadata = {}
+
+            # Step 1: Fetch initial session cookies from LinkedIn homepage
+            try:
+                homepage = li.client.session.get(
+                    f"{Client.LINKEDIN_BASE_URL}/",
+                    timeout=15,
+                )
+                logger.debug("Homepage cookies: %s", list(li.client.session.cookies.keys()))
+            except Exception as e:
+                logger.warning("Could not fetch homepage cookies: %s", e)
+
+            # Step 2: Inject auth cookies (overrides session JSESSIONID)
+            for cookie in cookies:
+                li.client.session.cookies.set(
+                    cookie["name"],
+                    cookie["value"],
+                    domain=cookie.get("domain", ".linkedin.com"),
+                    path=cookie.get("path", "/"),
+                )
+
+            # Step 3: Set CSRF token from JSESSIONID
+            csrf = ""
+            for cookie in cookies:
+                if cookie["name"] == "JSESSIONID":
+                    csrf = cookie["value"].strip('"')
+                    break
+            if csrf:
+                li.client.session.headers["csrf-token"] = csrf
+
+            # Step 4: Validate the session
+            test = li.client.session.get(
+                f"{Client.API_BASE_URL}/me",
+                timeout=10,
+            )
+            if test.status_code == 200:
+                self._api = li
+                # Cache profile in metadata
+                try:
+                    li.client.metadata["me"] = test.json()
+                except Exception:
+                    pass
+                logger.info("LinkedIn cookie login successful!")
+                return True
+            else:
+                logger.error("Cookie login validation failed: %d", test.status_code)
+                return False
+
+        except Exception as e:
+            logger.error("Cookie login failed: %s", e)
+            return False
+
+    def reauth(self) -> bool:
+        """Force re-authentication. Tries password login then cookie fallback."""
+        logger.info("Re-authenticating LinkedIn session...")
+        self._api = None
+        self._profile_urn_cache = None
+        return self.login()
 
     @property
     def is_logged_in(self):
@@ -151,13 +234,27 @@ class LinkedInClient:
                 return True
             try:
                 self._random_delay()
-                self._api.add_connection(profile_urn, message=message)
-                self._connections_today += 1
-                self._total_sent += 1
-                logger.info("Connection request sent to %s (%d today)", profile_urn, self._connections_today)
-                return True
+                # Use the newer Voyager relationships endpoint
+                payload = {
+                    "inviteeProfileUrn": f"urn:li:fsd_profile:{profile_urn}",
+                }
+                if message:
+                    payload["customMessage"] = message[:300]
+                resp = self._api._post(
+                    "/voyagerRelationshipsDashMemberRelationships?action=verifyQuotaAndCreate",
+                    json=payload,
+                )
+                if resp.status_code in (200, 201):
+                    self._connections_today += 1
+                    self._total_sent += 1
+                    logger.info("Connection request sent to %s (%d today)", profile_urn[:20], self._connections_today)
+                    return True
+                else:
+                    logger.warning("Connection request failed for %s: %d %s",
+                                   profile_urn[:20], resp.status_code, resp.text[:200])
+                    return False
             except Exception as e:
-                logger.error("Failed to send connection to %s: %s", profile_urn, e)
+                logger.error("Failed to send connection to %s: %s", profile_urn[:20], e)
                 return False
 
     def send_message(self, conversation_urn_or_recipients, message):

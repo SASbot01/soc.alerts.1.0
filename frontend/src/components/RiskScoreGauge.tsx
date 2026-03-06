@@ -97,7 +97,7 @@ const RiskScoreGauge: React.FC = () => {
                     <div className="space-y-1.5">
                         {Object.entries(breakdown).map(([key, val]) => (
                             <div key={key} className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-500 uppercase w-20 truncate">{key}</span>
+                                <span className="text-[10px] text-slate-500 uppercase w-28 shrink-0">{key}</span>
                                 <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                     <div
                                         className={`h-full rounded-full ${val.score >= 75 ? 'bg-red-500' : val.score >= 50 ? 'bg-orange-500' : val.score >= 25 ? 'bg-yellow-500' : 'bg-emerald-500'}`}

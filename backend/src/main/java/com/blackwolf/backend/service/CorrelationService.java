@@ -42,7 +42,7 @@ public class CorrelationService {
     private SseService sseService;
 
     // Deduplication window: skip creating incidents if this rule already fired recently
-    private static final int DEDUP_WINDOW_MINUTES = 15;
+    private static final int DEDUP_WINDOW_MINUTES = 30;
 
     public void evaluateThreat(ThreatEvent threat) {
         List<CorrelationRule> rules = ruleRepository.findByIsActiveTrue();
@@ -100,10 +100,9 @@ public class CorrelationService {
 
     private boolean matchesRule(ThreatEvent threat, CorrelationRule rule) {
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(rule.getTimeWindowMinutes());
-        List<ThreatEvent> recentThreats = threatEventRepository.findByCompanyId(threat.getCompanyId())
-                .stream()
-                .filter(t -> t.getTimestamp() != null && t.getTimestamp().isAfter(windowStart))
-                .collect(Collectors.toList());
+        // Performance fix: use time-bounded query instead of loading ALL threats
+        List<ThreatEvent> recentThreats = threatEventRepository
+                .findByCompanyIdAndTimestampAfterOrderByTimestampDesc(threat.getCompanyId(), windowStart);
 
         return switch (rule.getRuleType()) {
             case "severity_threshold" ->
@@ -143,10 +142,31 @@ public class CorrelationService {
                 yield distinctTypes >= rule.getThresholdCount();
             }
 
+            case "same_subnet_threshold" -> {
+                // Match threats from the same /24 subnet
+                String subnet = extractSubnet24(threat.getSrcIp());
+                if (subnet == null) yield false;
+                if (rule.getMinSeverity() != null && threat.getSeverity() != null
+                        && threat.getSeverity() < rule.getMinSeverity()) {
+                    yield false;
+                }
+                long count = recentThreats.stream()
+                        .filter(t -> t.getSrcIp() != null && subnet.equals(extractSubnet24(t.getSrcIp())))
+                        .count();
+                yield count >= rule.getThresholdCount();
+            }
+
             case "attack_chain" -> matchesAttackChain(threat, rule, recentThreats);
 
             default -> false;
         };
+    }
+
+    private static String extractSubnet24(String ip) {
+        if (ip == null || !ip.contains(".")) return null;
+        String[] parts = ip.split("\\.");
+        if (parts.length != 4) return null;
+        return parts[0] + "." + parts[1] + "." + parts[2] + ".0/24";
     }
 
     private boolean matchesAttackChain(ThreatEvent threat, CorrelationRule rule, List<ThreatEvent> recentThreats) {

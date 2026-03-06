@@ -5,7 +5,7 @@ import {
     LayoutDashboard, ShieldAlert, Radio, LogOut, Settings, Menu,
     ClipboardCheck, Crosshair, Bug, Award, Users, Building2,
     AlertCircle, Bell, FileText, Zap, Server, Grid3X3, Brain, CreditCard, ShieldCheck, Plug, Search, FileCode,
-    Activity, ShoppingBag
+    Activity, ShoppingBag, Bot, Sparkles, HardDrive
 } from 'lucide-react';
 import clsx from 'clsx';
 import AiChatWidget from './AiChatWidget';
@@ -21,6 +21,7 @@ const Layout: React.FC = () => {
         { name: 'Global Overview', path: '/', icon: LayoutDashboard },
         { name: 'Companies', path: '/superadmin/companies', icon: Building2 },
         { name: 'Onboarding', path: '/superadmin/onboarding', icon: FileText },
+        { name: 'Bot Dashboard', path: '/superadmin/bot', icon: Bot },
     ];
 
     const mainNavItems = [
@@ -32,9 +33,11 @@ const Layout: React.FC = () => {
         { name: 'Sensors', path: '/sensors', icon: Radio, permission: 'sensors:read' },
         { name: 'Alerts', path: '/alerts', icon: Bell, permission: 'alerts:read' },
         { name: 'AI Agent', path: '/ai-decisions', icon: Brain, permission: 'ai_agent:read' },
+        { name: 'AI Evolution', path: '/ai-evolution', icon: Sparkles, permission: 'ai_agent:read' },
         { name: 'Threat Hunting', path: '/hunting', icon: Search, permission: 'threats:read' },
         { name: 'SIGMA Rules', path: '/sigma', icon: FileCode, permission: 'threats:read' },
         { name: 'UEBA', path: '/ueba', icon: Activity, permission: 'threats:read' },
+        { name: 'Infrastructure', path: '/infrastructure', icon: HardDrive, permission: 'dashboard:read' },
     ];
 
     const socNavItems = [

@@ -48,3 +48,36 @@ GOOGLE_DELAY_SECONDS = int(os.getenv("GOOGLE_DELAY_SECONDS", "10"))
 # SMTP verification
 SMTP_VERIFY_ENABLED = os.getenv("SMTP_VERIFY_ENABLED", "true").lower() == "true"
 SMTP_VERIFY_TIMEOUT = int(os.getenv("SMTP_VERIFY_TIMEOUT", "10"))
+
+# Gemini API (for content + image generation)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# Auto-publishing schedule (24h format)
+PUBLISH_HOUR_1 = int(os.getenv("PUBLISH_HOUR_1", "10"))
+PUBLISH_HOUR_2 = int(os.getenv("PUBLISH_HOUR_2", "16"))
+PUBLISH_ENABLED = os.getenv("PUBLISH_ENABLED", "true").lower() == "true"
+
+# Post topic rotation
+POST_TOPICS = [
+    "stats_attacks_blocked",
+    "cybersecurity_tip",
+    "soc_use_case",
+    "current_threats",
+    "alert_fatigue",
+    "autonomous_response",
+    "compliance_security",
+    "incident_response",
+]
+
+# LinkedIn cookie path (fallback auth)
+LINKEDIN_COOKIES_PATH = os.getenv("LINKEDIN_COOKIES_PATH", "/app/cookies/li_cookies.json")
+
+# Gmail SMTP (for prospect outreach emails)
+MAIL_HOST = os.getenv("MAIL_HOST", "")
+MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+MAIL_SMTP_AUTH = os.getenv("MAIL_SMTP_AUTH", "false").lower() == "true"
+MAIL_SMTP_STARTTLS = os.getenv("MAIL_SMTP_STARTTLS", "true").lower() == "true"
+ALERT_FROM_EMAIL = os.getenv("ALERT_FROM_EMAIL", "")
+EMAIL_OUTREACH_ENABLED = os.getenv("EMAIL_OUTREACH_ENABLED", "true").lower() == "true"

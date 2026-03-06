@@ -30,6 +30,9 @@ public class SensorService {
     private BlockedIPRepository blockedIPRepository;
 
     @Autowired
+    private BlockedSubnetRepository blockedSubnetRepository;
+
+    @Autowired
     private CorrelationService correlationService;
 
     @Autowired
@@ -107,15 +110,37 @@ public class SensorService {
         // Process Threats
         List<ThreatInfo> threats = upload.getThreats();
         if (threats != null) {
-            // Dedup window: suppress duplicate alerts from same IP+type within 5 minutes
-            LocalDateTime dedupSince = LocalDateTime.now().minusMinutes(5);
+            // Load active blocked subnets once for this upload batch
+            List<BlockedSubnet> activeSubnets = blockedSubnetRepository.findActiveByCompanyId(
+                    upload.getCompany_id(), LocalDateTime.now());
+
+            // Dedup window: suppress duplicate alerts from same IP+type within 30 minutes
+            LocalDateTime dedupSince = LocalDateTime.now().minusMinutes(30);
 
             for (ThreatInfo t : threats) {
+                // Subnet block check: skip processing if source IP is in a blocked subnet
+                if (t.getSrc_ip() != null && isIpInBlockedSubnet(t.getSrc_ip(), activeSubnets)) {
+                    ThreatEvent event = new ThreatEvent();
+                    event.setId(UUID.randomUUID().toString());
+                    event.setCompanyId(upload.getCompany_id());
+                    event.setSensorId(upload.getSensor_id());
+                    event.setThreatType(t.getThreat_type());
+                    event.setSeverity(t.getSeverity());
+                    event.setSrcIp(t.getSrc_ip());
+                    event.setDstIp(t.getDst_ip());
+                    event.setDstPort(t.getDst_port());
+                    event.setTimestamp(LocalDateTime.now());
+                    event.setStatus("blocked_subnet");
+                    event.setDescription(t.getDescription());
+                    threatEventRepository.save(event);
+                    continue;
+                }
+
                 // Temporal deduplication: skip if we already have recent events from same IP+type
                 if (t.getSrc_ip() != null && t.getThreat_type() != null) {
                     long recentCount = threatEventRepository.countRecentDuplicates(
                             upload.getCompany_id(), t.getSrc_ip(), t.getThreat_type(), dedupSince);
-                    if (recentCount >= 3) {
+                    if (recentCount >= 5) {
                         // Still save the event for historical record, but skip alerts/correlation
                         ThreatEvent event = new ThreatEvent();
                         event.setId(UUID.randomUUID().toString());
@@ -151,7 +176,8 @@ public class SensorService {
 
                 try {
                     correlationService.evaluateThreat(event);
-                    alertService.fireAlertsForThreat(event);
+                    // Per-threat email/slack alerts disabled — too noisy and costs SMTP credits.
+                    // Alerts are sent only for incidents (correlated, important events).
                     sseService.emitThreat(event);
                     playbookService.triggerForThreat(event);
                     mitreService.autoMapThreat(event.getId(), event.getCompanyId());
@@ -209,15 +235,27 @@ public class SensorService {
                             // IP already blocked by concurrent thread
                         }
                     }
+
+                    // Auto-subnet-blocking: if ≥3 IPs from same /24 are individually blocked, block the subnet
+                    try {
+                        autoBlockSubnetIfNeeded(upload.getCompany_id(), t.getSrc_ip());
+                    } catch (Exception ignored) {}
                 }
             }
         }
 
-        // Get Commands (Blocked IPs - only active, non-expired)
+        // Get Commands (Blocked IPs + Blocked Subnets - only active, non-expired)
         List<BlockedIP> blockedIPs = blockedIPRepository.findActiveByCompanyId(upload.getCompany_id(), LocalDateTime.now());
-        List<Command> commands = blockedIPs.stream()
+        List<Command> commands = new ArrayList<>(blockedIPs.stream()
                 .map(b -> new Command("block_ip", b.getIp(), b.getReason()))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
+
+        // Include subnet block commands
+        List<BlockedSubnet> blockedSubnets = blockedSubnetRepository.findActiveByCompanyId(
+                upload.getCompany_id(), LocalDateTime.now());
+        for (BlockedSubnet bs : blockedSubnets) {
+            commands.add(new Command("block_subnet", bs.getCidr(), bs.getReason()));
+        }
 
         SensorResponse response = new SensorResponse();
         response.setStatus("success");
@@ -225,6 +263,47 @@ public class SensorService {
         response.setProcessed_threats(threats != null ? threats.size() : 0);
         response.setCommands(commands);
         return response;
+    }
+
+    // ===== Subnet Helpers =====
+
+    private boolean isIpInBlockedSubnet(String ip, List<BlockedSubnet> activeSubnets) {
+        if (ip == null || !ip.contains(".") || activeSubnets.isEmpty()) return false;
+        String subnet = extractSubnet24(ip);
+        if (subnet == null) return false;
+        return activeSubnets.stream().anyMatch(bs -> bs.getCidr().equals(subnet));
+    }
+
+    private void autoBlockSubnetIfNeeded(String companyId, String srcIp) {
+        String subnet = extractSubnet24(srcIp);
+        if (subnet == null) return;
+        if (blockedSubnetRepository.existsByCompanyIdAndCidr(companyId, subnet)) return;
+
+        // Count how many individual IPs from this /24 are currently blocked
+        List<BlockedIP> activeIPs = blockedIPRepository.findActiveByCompanyId(companyId, LocalDateTime.now());
+        long sameSubnetCount = activeIPs.stream()
+                .filter(b -> subnet.equals(extractSubnet24(b.getIp())))
+                .count();
+
+        if (sameSubnetCount >= 3) {
+            BlockedSubnet bs = new BlockedSubnet();
+            bs.setCidr(subnet);
+            bs.setCompanyId(companyId);
+            bs.setReason("Auto-blocked: " + sameSubnetCount + " IPs from this subnet individually blocked");
+            bs.setBlockedAt(LocalDateTime.now());
+            bs.setExpiresAt(LocalDateTime.now().plusHours(72));
+            bs.setBlockedBy("sensor-auto");
+            try {
+                blockedSubnetRepository.save(bs);
+            } catch (org.springframework.dao.DataIntegrityViolationException ignored) {}
+        }
+    }
+
+    private static String extractSubnet24(String ip) {
+        if (ip == null || !ip.contains(".")) return null;
+        String[] parts = ip.split("\\.");
+        if (parts.length != 4) return null;
+        return parts[0] + "." + parts[1] + "." + parts[2] + ".0/24";
     }
 
     // ===== Sensor Catalog =====

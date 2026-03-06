@@ -23,4 +23,6 @@ public interface IncidentRepository extends JpaRepository<Incident, String> {
     long countByCompanyIdAndCreatedAtAfter(String companyId, LocalDateTime after);
 
     long countByCompanyIdAndStatusAndUpdatedAtAfter(String companyId, String status, LocalDateTime after);
+
+    List<Incident> findByCompanyIdAndStatusIn(String companyId, List<String> statuses);
 }

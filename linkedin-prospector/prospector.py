@@ -2,6 +2,7 @@
 Core prospecting logic: LinkedIn search -> Google email discovery -> send connection -> POST to backend.
 """
 
+import re
 import random
 import logging
 import requests
@@ -10,8 +11,49 @@ import config
 from linkedin_client import LinkedInClient
 from google_email_finder import find_email
 from email_verifier import verify_email
+from gmail_sender import send_prospect_email
 
 logger = logging.getLogger(__name__)
+
+# Only reliable separators between title and company
+_COMPANY_SEPARATORS = [" at ", " en ", " @ ", " bij ", " bei ", " chez "]
+
+
+def _parse_search_result(result, target_title):
+    """Extract first_name, last_name, company_name, headline from a search result."""
+    name = result.get("name", "").strip()
+    if not name:
+        return None
+
+    # Clean name: remove certifications like ", CISSP" etc.
+    clean_name = re.split(r",\s*(?:CISSP|CISM|CEH|MBA|PhD|PMP|CCISO|MSc)", name)[0].strip()
+    parts = clean_name.split()
+    first_name = parts[0] if parts else ""
+    last_name = parts[-1] if len(parts) > 1 else ""
+
+    headline = result.get("jobtitle", "")
+    company_name = ""
+
+    # Parse company from jobtitle: "CISO at Company Name" / "CISO en JICECO"
+    for sep in _COMPANY_SEPARATORS:
+        if sep.lower() in headline.lower():
+            idx = headline.lower().index(sep.lower())
+            company_part = headline[idx + len(sep):].strip()
+            # Clean trailing parentheticals and pipe-separated extra text
+            company_part = re.split(r"\s*[|(]", company_part)[0].strip()
+            # Skip if result looks like a title, not a company (too long or has keywords)
+            if len(company_part) < 80 and company_part:
+                company_name = company_part
+            break
+
+    return {
+        "first_name": first_name,
+        "last_name": last_name,
+        "full_name": clean_name,
+        "headline": headline,
+        "company_name": company_name,
+        "location": result.get("location", ""),
+    }
 
 
 class Prospector:
@@ -23,10 +65,11 @@ class Prospector:
         """
         Full prospecting cycle:
         1. Search LinkedIn for target profiles
-        2. For each result, get profile details
+        2. Parse name/company from search results
         3. Find their email via Google
         4. Send LinkedIn connection request
-        5. POST lead to backend
+        5. Send outreach email
+        6. POST lead to backend
         """
         if self.li.is_paused:
             logger.info("Prospector paused, skipping search cycle")
@@ -35,46 +78,33 @@ class Prospector:
         total_processed = 0
         total_connections = 0
         total_leads = 0
+        total_emails_sent = 0
 
         for title in config.TARGET_TITLES:
             results = self.li.search_people(title=title.strip(), limit=15)
 
             for result in results:
-                public_id = result.get("public_id")
                 urn_id = result.get("urn_id")
 
-                if not public_id or urn_id in self._processed_urns:
+                if not urn_id or urn_id in self._processed_urns:
                     continue
 
                 self._processed_urns.add(urn_id)
 
-                # Get full profile
-                profile = self.li.get_profile(public_id)
-                if not profile:
+                # Parse info directly from search result (no extra API call)
+                info = _parse_search_result(result, title.strip())
+                if not info or not info["company_name"]:
                     continue
 
-                first_name = profile.get("firstName", "")
-                last_name = profile.get("lastName", "")
-                full_name = f"{first_name} {last_name}".strip()
-                headline = profile.get("headline", "")
-                company_name = ""
-                company_domain = ""
-
-                # Extract current company
-                experiences = profile.get("experience", [])
-                if experiences:
-                    current = experiences[0]
-                    company_name = current.get("companyName", "")
-                    # Try to extract domain from company page
-                    company_domain = current.get("company", {}).get("websiteUrl", "") if isinstance(current.get("company"), dict) else ""
-
-                if not company_name:
-                    continue
+                first_name = info["first_name"]
+                full_name = info["full_name"]
+                company_name = info["company_name"]
+                headline = info["headline"]
 
                 logger.info("Processing: %s, %s at %s", full_name, headline, company_name)
 
                 # Find email via Google
-                email = find_email(full_name, title.strip(), company_name, company_domain or None)
+                email = find_email(full_name, title.strip(), company_name)
 
                 # Verify email if found
                 if email and not verify_email(email):
@@ -96,15 +126,26 @@ class Prospector:
                 if conn_sent:
                     total_connections += 1
 
+                # Send outreach email if we found a valid email
+                if email and config.EMAIL_OUTREACH_ENABLED:
+                    email_sent = send_prospect_email(
+                        to_email=email,
+                        first_name=first_name,
+                        company_name=company_name,
+                        template_index=total_emails_sent,
+                    )
+                    if email_sent:
+                        total_emails_sent += 1
+
                 # POST lead to backend
                 if email or conn_sent:
                     lead_posted = self._post_lead(
                         email=email,
                         company_name=company_name,
-                        domain=company_domain,
+                        domain="",
                         contact_name=full_name,
                         title=headline or title.strip(),
-                        linkedin_id=public_id,
+                        linkedin_id=urn_id,
                     )
                     if lead_posted:
                         total_leads += 1
@@ -122,6 +163,7 @@ class Prospector:
             "status": "completed",
             "processed": total_processed,
             "connections_sent": total_connections,
+            "emails_sent": total_emails_sent,
             "leads_posted": total_leads,
         }
         logger.info("Search cycle complete: %s", result)

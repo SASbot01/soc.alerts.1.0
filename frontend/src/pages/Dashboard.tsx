@@ -114,7 +114,7 @@ const Dashboard: React.FC = () => {
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
-                                <XAxis dataKey="name" stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
+                                <XAxis dataKey="name" stroke="#999999" fontSize={11} tickLine={false} axisLine={false} angle={-35} textAnchor="end" height={60} interval={0} />
                                 <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}

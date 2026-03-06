@@ -90,7 +90,8 @@ public class SecurityConfig {
                                 "/api/v1/prospects/track/**",
                                 "/api/v1/prospects/unsubscribe",
                                 "/api/v1/onboarding/submit-and-checkout",
-                                "/api/v1/prospects/from-bot"
+                                "/api/v1/prospects/from-bot",
+                                "/api/v1/backups/report"
                         ).permitAll()
                         .anyRequest().authenticated());
 

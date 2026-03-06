@@ -417,7 +417,7 @@ const ThreatMap: React.FC<ThreatMapProps> = ({ refreshTrigger = 0 }) => {
 
                     {/* Stats */}
                     <text x="15" y="490" fill="#475569" fontSize="10" fontFamily="monospace">
-                        {points.length} unique sources | {points.reduce((s, p) => s + p.count, 0)} total events | {[...new Set(points.map(p => p.country))].length} countries
+                        {points.length} unique sources | {points.reduce((s, p) => s + p.count, 0)} total events | {[...new Set(points.map(p => p.country))].length} {[...new Set(points.map(p => p.country))].length === 1 ? 'country' : 'countries'}
                     </text>
                 </svg>
             )}

@@ -531,6 +531,37 @@ export const reportService = {
     }),
 };
 
+// ===== Prospector Bot (superadmin) =====
+
+export const prospectorBotService = {
+  health: () =>
+    api.get('/superadmin/bot/health').then(r => r.data),
+
+  status: () =>
+    api.get('/superadmin/bot/status').then(r => r.data),
+
+  search: () =>
+    api.post('/superadmin/bot/search').then(r => r.data),
+
+  followup: () =>
+    api.post('/superadmin/bot/followup').then(r => r.data),
+
+  publish: () =>
+    api.post('/superadmin/bot/publish').then(r => r.data),
+
+  pause: () =>
+    api.post('/superadmin/bot/pause').then(r => r.data),
+
+  resume: () =>
+    api.post('/superadmin/bot/resume').then(r => r.data),
+
+  relogin: () =>
+    api.post('/superadmin/bot/relogin').then(r => r.data),
+
+  uploadCookies: (cookies: unknown[]) =>
+    api.post('/superadmin/bot/cookies', { cookies }).then(r => r.data),
+};
+
 // ===== Threat Hunting =====
 
 export const huntingService = {
@@ -552,4 +583,79 @@ export const huntingService = {
     api.get(`/hunting/aggregations?field=${field}&timeRange=${timeRange}`).then(r => r.data),
 
   history: (id: string) => api.get(`/hunting/${id}/history`).then(r => r.data),
+};
+
+// ===== AI Evolution =====
+
+export const aiEvolutionService = {
+  getDashboard: () =>
+    api.get('/ai-agent/evolution/dashboard').then(r => r.data),
+
+  getStudies: (type?: string) =>
+    api.get('/ai-agent/evolution/studies', { params: type ? { type } : {} }).then(r => r.data),
+
+  getStudy: (id: string) =>
+    api.get(`/ai-agent/evolution/studies/${id}`).then(r => r.data),
+
+  triggerStudy: (incidentId: string) =>
+    api.post(`/ai-agent/evolution/studies/${incidentId}/analyze`).then(r => r.data),
+
+  getSnapshots: () =>
+    api.get('/ai-agent/evolution/snapshots').then(r => r.data),
+
+  getTimeline: (days: number = 30) =>
+    api.get(`/ai-agent/evolution/timeline?days=${days}`).then(r => r.data),
+
+  downloadEvolutionPDF: (days: number = 30) =>
+    api.get(`/ai-agent/evolution/reports/pdf?days=${days}`, { responseType: 'blob' }).then(r => {
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'ai-evolution-report.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }),
+};
+
+// ===== Agent Download =====
+
+export const agentService = {
+  getInfo: () => api.get('/agent/info').then(r => r.data),
+  download: () => api.get('/agent/download', { responseType: 'blob' }).then(r => {
+    const url = window.URL.createObjectURL(new Blob([r.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'blackwolf-agent.zip');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }),
+};
+
+// ===== Backup Monitoring =====
+
+export const backupService = {
+  getDashboard: () => api.get('/backups/dashboard').then(r => r.data),
+  getHistory: () => api.get('/backups/history').then(r => r.data),
+};
+
+// ===== Health Checks =====
+
+export const healthCheckService = {
+  getDashboard: () => api.get('/health-checks/dashboard').then(r => r.data),
+  listTargets: () => api.get('/health-checks/targets').then(r => r.data),
+  createTarget: (data: any) => api.post('/health-checks/targets', data).then(r => r.data),
+  deleteTarget: (id: string) => api.delete(`/health-checks/targets/${id}`).then(r => r.data),
+  toggleTarget: (id: string) => api.post(`/health-checks/targets/${id}/toggle`).then(r => r.data),
+  runCheck: (id: string) => api.post(`/health-checks/targets/${id}/run`).then(r => r.data),
+  runAll: () => api.post('/health-checks/run-all').then(r => r.data),
+};
+
+// ===== LDAP Directory =====
+
+export const ldapService = {
+  getConfig: () => api.get('/ldap/config').then(r => r.data),
+  createUsers: (users: any[]) => api.post('/ldap/users/bulk', { users }).then(r => r.data),
+  getSyncLogs: () => api.get('/ldap/sync-logs').then(r => r.data),
 };

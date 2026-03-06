@@ -33,6 +33,28 @@ services:
     networks:
       - blackwolf-net
 
+  lldap:
+    image: lldap/lldap:latest
+    restart: always
+    environment:
+      LLDAP_JWT_SECRET: ${LDAP_JWT_SECRET:-change-me-jwt-secret-blackwolf}
+      LLDAP_LDAP_USER_PASS: ${LDAP_ADMIN_PASSWORD:-admin1234}
+      LLDAP_LDAP_BASE_DN: ${LDAP_BASE_DN:-dc=blackwolf,dc=io}
+      LLDAP_DATABASE_URL: sqlite:///data/lldap_db.sqlite?mode=rwc
+    ports:
+      - "3890:3890"
+      - "17170:17170"
+    volumes:
+      - lldap_data:/data
+    networks:
+      - blackwolf-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:17170 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   redis:
     image: redis:7-alpine
     restart: always
@@ -121,6 +143,10 @@ services:
       ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-soc@blackwolf.io}
       APP_BASE_URL: ${APP_BASE_URL:-https://soc.blackwolfsec.io}
       PROSPECTOR_API_KEY: ${PROSPECTOR_API_KEY:-}
+      LDAP_URL: http://lldap:17170
+      LDAP_ADMIN_USER: admin
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin1234}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-dc=blackwolf,dc=io}
       CORS_ALLOWED_ORIGINS: https://soc.blackwolfsec.io,http://soc.blackwolfsec.io,http://localhost:5173,http://localhost:80
     depends_on:
       mysql:
@@ -130,6 +156,8 @@ services:
       redis:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+      lldap:
         condition: service_healthy
     networks:
       - blackwolf-net
@@ -272,6 +300,24 @@ services:
     networks:
       - blackwolf-net
 
+  backup-monitor:
+    build:
+      context: ./backup-monitor
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      SOC_API_URL: http://backend:8080/api/v1
+      SOC_API_KEY: ${SOC_API_KEY}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID}
+      CHECK_INTERVAL: ${BACKUP_CHECK_INTERVAL:-3600}
+      BACKUP_DIRS: ${BACKUP_DIRS:-/var/backups}
+      MAX_AGE_HOURS: ${BACKUP_MAX_AGE_HOURS:-25}
+    volumes:
+      - /var/backups:/var/backups:ro
+    networks:
+      - blackwolf-net
+
   linkedin-prospector:
     build:
       context: ../linkedin-prospector
@@ -292,6 +338,21 @@ services:
       WORK_HOUR_END: ${PROSPECTOR_WORK_END:-18}
       GOOGLE_SEARCH_ENABLED: ${PROSPECTOR_GOOGLE_ENABLED:-true}
       SMTP_VERIFY_ENABLED: ${PROSPECTOR_SMTP_VERIFY:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PUBLISH_ENABLED: ${PROSPECTOR_PUBLISH_ENABLED:-true}
+      PUBLISH_HOUR_1: ${PROSPECTOR_PUBLISH_HOUR_1:-10}
+      PUBLISH_HOUR_2: ${PROSPECTOR_PUBLISH_HOUR_2:-16}
+      LINKEDIN_COOKIES_PATH: /app/cookies/li_cookies.json
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
+      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-}
+      EMAIL_OUTREACH_ENABLED: ${EMAIL_OUTREACH_ENABLED:-true}
+    volumes:
+      - linkedin_cookies:/app/cookies
     networks:
       - blackwolf-net
 
@@ -301,8 +362,10 @@ networks:
 
 volumes:
   mysql_data:
+  lldap_data:
   minio_data:
   redis_data:
   es_data:
   suricata_logs:
   nginx_logs:
+  linkedin_cookies:
