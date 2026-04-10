@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Brain, Shield, Target, TrendingUp, Download, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { Sparkles, Brain, Shield, Target, TrendingUp, Download, ChevronDown, ChevronRight, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
+import api from '../lib/api';
 import { aiEvolutionService } from '../lib/services';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -56,6 +57,8 @@ const AiEvolution: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,6 +100,29 @@ const AiEvolution: React.FC = () => {
       console.error('Failed to export PDF:', err);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handlePurgeCorrupted = async () => {
+    if (!confirm('Esto marcara como FAILED todos los estudios con respuestas degeneradas/corruptas. Los nuevos estudios empezaran limpios. Continuar?')) return;
+    setPurging(true);
+    setPurgeResult(null);
+    try {
+      const res = await api.post('/ai-agent/evolution/studies/purge-corrupted');
+      setPurgeResult(res.data.message);
+      // Reload data
+      const [s, t, st] = await Promise.all([
+        aiEvolutionService.getDashboard(),
+        aiEvolutionService.getTimeline(selectedRange),
+        aiEvolutionService.getStudies(),
+      ]);
+      setStats(s);
+      setTimeline(t);
+      setStudies(st);
+    } catch (err) {
+      setPurgeResult('Error al purgar estudios');
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -157,6 +183,15 @@ const AiEvolution: React.FC = () => {
             ))}
           </div>
           <button
+            onClick={handlePurgeCorrupted}
+            disabled={purging}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-[2px] border border-red-500/30 transition-colors disabled:opacity-50"
+            title="Purgar estudios corruptos generados por feedback loops de la IA"
+          >
+            {purging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Purgar Corruptos
+          </button>
+          <button
             onClick={handleExportPDF}
             disabled={exporting}
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-[2px] border border-slate-700 transition-colors disabled:opacity-50"
@@ -166,6 +201,15 @@ const AiEvolution: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Purge result banner */}
+      {purgeResult && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-[2px] p-3 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="text-sm text-amber-300">{purgeResult}</span>
+          <button onClick={() => setPurgeResult(null)} className="ml-auto text-slate-500 hover:text-white text-xs">Cerrar</button>
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

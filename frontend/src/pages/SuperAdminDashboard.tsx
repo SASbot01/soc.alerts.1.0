@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { superAdminService } from '../lib/services';
-import { Building2, ShieldAlert, Radio, Globe, Activity, ArrowRight } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+    Building2, ShieldAlert, Radio, Globe, Activity, ChevronRight,
+    Shield, ArrowUpRight, Server, AlertCircle, Bug, HardDrive,
+    Bell, Brain, ClipboardCheck, Plus,
+} from 'lucide-react';
 
 interface CompanySummary {
     id: string;
@@ -25,10 +28,29 @@ interface GlobalDashboard {
     globalAttackDistribution: Record<string, number>;
 }
 
+// ── BlackWolf section shortcuts ──
+const BW_SECTIONS = [
+    { name: 'Amenazas', icon: ShieldAlert, color: '#EF4444' },
+    { name: 'Incidentes', icon: AlertCircle, color: '#F59E0B' },
+    { name: 'Assets', icon: Server, color: '#3B82F6' },
+    { name: 'Infra', icon: HardDrive, color: '#22C55E' },
+    { name: 'Vulns', icon: Bug, color: '#A855F7' },
+    { name: 'Auditorias', icon: ClipboardCheck, color: '#F5F5F5' },
+    { name: 'Alertas', icon: Bell, color: '#06B6D4' },
+    { name: 'AI Agent', icon: Brain, color: '#EC4899' },
+];
+
+function useClock() {
+    const [now, setNow] = useState(new Date());
+    useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+    return now;
+}
+
 const SuperAdminDashboard: React.FC = () => {
     const [data, setData] = useState<GlobalDashboard | null>(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const now = useClock();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -46,111 +68,202 @@ const SuperAdminDashboard: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    if (loading) return <div className="p-8 text-slate-400">Loading global dashboard...</div>;
-    if (!data) return <div className="p-8 text-red-400">Failed to load data.</div>;
+    const h = now.getHours();
+    const greeting = h < 7 ? 'Buenas noches' : h < 13 ? 'Buenos dias' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
-    const stats = [
-        { label: 'Companies', value: data.totalCompanies, icon: Building2, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
-        { label: 'Total Threats', value: data.totalThreats, icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-400/10' },
-        { label: 'Threats Today', value: data.threatsToday, icon: Activity, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-        { label: 'Active Sensors', value: `${data.activeSensors}/${data.totalSensors}`, icon: Radio, color: 'text-green-400', bg: 'bg-green-400/10' },
-        { label: 'Blocked IPs', value: data.totalBlockedIPs, icon: Globe, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    ];
+    if (loading) return <div style={{ padding: 40, color: 'rgba(255,255,255,0.4)' }}>Cargando...</div>;
+    if (!data) return <div style={{ padding: 40, color: '#EF4444' }}>Error cargando datos.</div>;
 
-    const chartData = Object.entries(data.globalAttackDistribution || {}).map(([name, value]) => ({ name, value }));
+    const bwCompany = data.companies.find(c => c.domain === 'blackwolfsec.io' || c.companyName.toLowerCase().includes('blackwolf'));
+    const clients = data.companies.filter(c => c.id !== bwCompany?.id && c.companyName !== 'BlackWolf Templates');
+
+    const getPlanColor = (plan: string) => {
+        const m: Record<string, string> = { starter: '#22C55E', professional: '#3B82F6', enterprise: '#A855F7' };
+        return m[plan] || '#666';
+    };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-white mb-1">Global Security Overview</h1>
-                <p className="text-slate-400">Cross-company threat monitoring dashboard</p>
+        <div className="soc-home">
+            {/* ── Header with clock ── */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
+                <div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 200, color: '#E4E4E7', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                        {timeStr}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.35)', marginTop: 6, textTransform: 'capitalize' }}>
+                        {greeting} — {dateStr}
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 100, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', fontSize: '0.72rem', color: '#22C55E' }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 6px #22C55E' }} />
+                        SOC Activo
+                    </div>
+                </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-[2px] backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-2 rounded-[2px] ${stat.bg} ${stat.color}`}>
-                                <stat.icon className="w-6 h-6" />
-                            </div>
-                            <span className="flex items-center text-xs font-medium text-slate-500 bg-slate-900/50 px-2 py-1 rounded-full">
-                                Live <div className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 animate-pulse" />
-                            </span>
+            {/* ── Global Quick Stats ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 32 }}>
+                {[
+                    { label: 'Empresas', value: data.totalCompanies, icon: Building2, color: '#A855F7' },
+                    { label: 'Amenazas', value: data.totalThreats, icon: ShieldAlert, color: '#EF4444' },
+                    { label: 'Hoy', value: data.threatsToday, icon: Activity, color: '#F59E0B' },
+                    { label: 'Sensores', value: `${data.activeSensors}/${data.totalSensors}`, icon: Radio, color: '#22C55E' },
+                    { label: 'IPs bloqueadas', value: data.totalBlockedIPs, icon: Globe, color: '#3B82F6' },
+                ].map((s, i) => (
+                    <div key={i} className="soc-stat">
+                        <div className="soc-stat__icon" style={{ background: `${s.color}12`, color: s.color }}>
+                            <s.icon style={{ width: 20, height: 20 }} />
                         </div>
-                        <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-                        <div className="text-sm text-slate-400">{stat.label}</div>
+                        <div className="soc-stat__value">{s.value}</div>
+                        <div className="soc-stat__label">{s.label}</div>
                     </div>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Chart */}
-                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
-                    <h3 className="text-lg font-semibold text-white mb-6">Global Threat Distribution</h3>
-                    <div className="h-[300px] w-full">
-                        {chartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#999999" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#999999" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
-                                    <XAxis dataKey="name" stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}
-                                        itemStyle={{ color: '#E0E0E0' }}
-                                    />
-                                    <Area type="monotone" dataKey="value" stroke="#999999" strokeWidth={3} fillOpacity={1} fill="url(#colorGlobal)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-slate-500">No threat data available</div>
-                        )}
+            {/* ══════════════════════════════════════════════
+                BLACKWOLF — Main Company (big card)
+               ══════════════════════════════════════════════ */}
+            {bwCompany && (
+                <div
+                    onClick={() => navigate(`/superadmin/company/${bwCompany.id}`)}
+                    style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 24,
+                        padding: 28,
+                        marginBottom: 32,
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}
+                >
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{
+                                width: 56, height: 56, borderRadius: 16,
+                                background: '#F5F5F5',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Shield style={{ width: 28, height: 28, color: '#000' }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#E4E4E7', letterSpacing: '-0.01em' }}>
+                                    BlackWolf Security
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontFamily: "'JetBrains Mono', monospace" }}>
+                                    {bwCompany.domain}
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#EF4444' }}>{bwCompany.threatCount}</div>
+                                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>amenazas</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#22C55E' }}>{bwCompany.sensorCount}</div>
+                                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>sensores</div>
+                            </div>
+                            <ChevronRight style={{ width: 20, height: 20, color: 'rgba(255,255,255,0.2)' }} />
+                        </div>
                     </div>
-                </div>
 
-                {/* Companies List */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-semibold text-white">Companies</h3>
-                        <button
-                            onClick={() => navigate('/superadmin/companies')}
-                            className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors"
-                        >
-                            View All <ArrowRight className="w-3 h-3" />
-                        </button>
-                    </div>
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700">
-                        {data.companies.length === 0 ? (
-                            <div className="text-sm text-slate-500 text-center py-4">No companies registered</div>
-                        ) : (
-                            data.companies.map((company) => (
-                                <button
-                                    key={company.id}
-                                    onClick={() => navigate(`/superadmin/company/${company.id}`)}
-                                    className="w-full flex items-center gap-3 p-3 rounded-[2px] bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors text-left"
-                                >
-                                    <div className="w-8 h-8 rounded-[2px] bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                                        <Building2 className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-white truncate">{company.companyName}</div>
-                                        <div className="text-xs text-slate-500">{company.domain}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-red-400 font-medium">{company.threatCount} threats</div>
-                                        <div className="text-xs text-slate-500">{company.sensorCount} sensors</div>
-                                    </div>
-                                </button>
-                            ))
-                        )}
+                    {/* Section shortcuts */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {BW_SECTIONS.map(s => (
+                            <div
+                                key={s.name}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    padding: '6px 12px', borderRadius: 100,
+                                    background: `${s.color}08`, border: `1px solid ${s.color}15`,
+                                    fontSize: '0.72rem', color: `${s.color}`, fontWeight: 500,
+                                }}
+                            >
+                                <s.icon style={{ width: 13, height: 13 }} />
+                                {s.name}
+                            </div>
+                        ))}
                     </div>
                 </div>
+            )}
+
+            {/* ══════════════════════════════════════════════
+                CLIENTES
+               ══════════════════════════════════════════════ */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                    Clientes ({clients.length})
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                        onClick={() => navigate('/superadmin/onboarding')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: '7px 14px', borderRadius: 100, fontSize: '0.72rem', fontWeight: 600,
+                            color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+                            transition: 'all 0.2s',
+                        }}
+                    >
+                        <Plus style={{ width: 13, height: 13 }} /> Onboarding
+                    </button>
+                    <button
+                        onClick={() => navigate('/superadmin/companies')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 4,
+                            padding: '7px 14px', borderRadius: 100, fontSize: '0.72rem', fontWeight: 500,
+                            color: 'rgba(255,255,255,0.4)', background: 'none',
+                            border: 'none', cursor: 'pointer',
+                        }}
+                    >
+                        Ver todos <ArrowUpRight style={{ width: 12, height: 12 }} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="soc-companies-grid">
+                {clients.map(company => (
+                    <button
+                        key={company.id}
+                        onClick={() => navigate(`/superadmin/company/${company.id}`)}
+                        className="soc-company-card"
+                    >
+                        <div className="soc-company-card__icon">
+                            <Building2 style={{ width: 20, height: 20, color: 'rgba(255,255,255,0.4)' }} />
+                        </div>
+                        <div className="soc-company-card__info">
+                            <div className="soc-company-card__name">{company.companyName}</div>
+                            <div className="soc-company-card__domain">{company.domain}</div>
+                        </div>
+                        <div className="soc-company-card__stats">
+                            <span style={{ color: '#EF4444', fontSize: '0.82rem', fontWeight: 600 }}>{company.threatCount}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.12)' }}>|</span>
+                            <span style={{ color: '#22C55E', fontSize: '0.82rem', fontWeight: 600 }}>{company.sensorCount}</span>
+                        </div>
+                        <div className="soc-company-card__badge" style={{ background: `${getPlanColor(company.plan)}12`, color: getPlanColor(company.plan), border: `1px solid ${getPlanColor(company.plan)}20` }}>
+                            {company.plan || 'starter'}
+                        </div>
+                        <ChevronRight style={{ width: 16, height: 16, color: 'rgba(255,255,255,0.15)' }} />
+                    </button>
+                ))}
+
+                {clients.length === 0 && (
+                    <div style={{
+                        gridColumn: '1 / -1', textAlign: 'center', padding: '48px 24px',
+                        color: 'rgba(255,255,255,0.2)', fontSize: '0.85rem',
+                        background: 'rgba(255,255,255,0.01)', borderRadius: 20,
+                        border: '1px dashed rgba(255,255,255,0.06)',
+                    }}>
+                        <Building2 style={{ width: 32, height: 32, margin: '0 auto 12px', opacity: 0.3 }} />
+                        Sin clientes integrados. Usa el onboarding para agregar empresas.
+                    </div>
+                )}
             </div>
         </div>
     );

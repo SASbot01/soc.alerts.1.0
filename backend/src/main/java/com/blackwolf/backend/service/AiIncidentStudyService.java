@@ -23,6 +23,22 @@ public class AiIncidentStudyService {
     private static final Logger log = LoggerFactory.getLogger(AiIncidentStudyService.class);
     private static final String CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
 
+    // Blacklist patterns that indicate a degenerate/corrupted AI response loop
+    private static final List<String> DEGENERATE_PATTERNS = List.of(
+            "CONFIRMACIÓN MATEMÁTICA",
+            "CRISIS ORGANIZACIONAL",
+            "DESTRUCCIÓN DEL MARCO ANALÍTICO",
+            "CERTEZA MATEMÁTICA",
+            "COLAPSO SISTÉMICO",
+            "FALLO CATASTRÓFICO",
+            "DESTRUCCIÓN PERPETUA",
+            "CRISIS PERPETUA"
+    );
+
+    // Max consecutive failed quality checks before pausing studies for this company
+    private static final int CIRCUIT_BREAKER_THRESHOLD = 3;
+    private final Map<String, Integer> companyFailureCount = new java.util.concurrent.ConcurrentHashMap<>();
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -77,6 +93,15 @@ public class AiIncidentStudyService {
     }
 
     private void studyCompanyIncidents(String companyId) {
+        // Circuit breaker: skip if too many consecutive degenerate responses
+        int failures = companyFailureCount.getOrDefault(companyId, 0);
+        if (failures >= CIRCUIT_BREAKER_THRESHOLD) {
+            log.warn("AI Evolution: Circuit breaker OPEN for company {} ({} consecutive degenerate responses). " +
+                    "Skipping studies. Will reset on next successful study or after restart.",
+                    companyId, failures);
+            return;
+        }
+
         LocalDateTime since = LocalDateTime.now().minusDays(studyLookbackDays);
         List<String> unstudied = studyRepository.findUnstudiedIncidentIds(companyId, since);
 
@@ -141,6 +166,24 @@ public class AiIncidentStudyService {
 
             // 5. Parse response
             parseAndPopulateStudy(study, content);
+
+            // 5.5. Quality gate: reject degenerate/corrupted responses
+            if (isDegenerateResponse(study)) {
+                log.warn("AI Evolution: DEGENERATE response detected for incident {}. Discarding study.", incidentId);
+                study.setStatus(AiIncidentStudy.StudyStatus.FAILED);
+                study.setErrorMessage("Quality gate rejected: degenerate/self-referential response detected");
+                study.setStudyDurationMs(System.currentTimeMillis() - startTime);
+                studyRepository.save(study);
+                companyFailureCount.merge(companyId, 1, Integer::sum);
+                sseService.emitAiAgentLog(companyId, "WARN", "QUALITY_GATE",
+                        "Study rejected for incident " + incidentId.substring(0, 8) +
+                        " - degenerate AI response detected. Circuit breaker: " +
+                        companyFailureCount.getOrDefault(companyId, 0) + "/" + CIRCUIT_BREAKER_THRESHOLD);
+                return study;
+            }
+
+            // Quality passed - reset circuit breaker
+            companyFailureCount.put(companyId, 0);
 
             // 6. Complete
             study.setStatus(AiIncidentStudy.StudyStatus.COMPLETED);
@@ -246,13 +289,25 @@ public class AiIncidentStudyService {
 
         if (recentStudies.isEmpty()) return "";
 
-        // Filter for similar incidents
+        // Filter: exclude current incident, exclude degenerate/corrupted studies, limit diversity
         List<AiIncidentStudy> similar = recentStudies.stream()
                 .filter(s -> !s.getIncidentId().equals(incident.getId()))
+                .filter(s -> !isDegenerateResponse(s))  // CRITICAL: exclude corrupted studies
                 .limit(5)
                 .collect(Collectors.toList());
 
         if (similar.isEmpty()) return "";
+
+        // Additional diversity check: skip if all studies have identical root causes
+        long uniqueRootCauses = similar.stream()
+                .map(AiIncidentStudy::getRootCause)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+        if (similar.size() > 2 && uniqueRootCauses <= 1) {
+            log.warn("AI Evolution: All past studies have identical root causes - skipping past context to break potential loop");
+            return "";
+        }
 
         StringBuilder ctx = new StringBuilder();
         ctx.append("\n=== ESTUDIOS SIMILARES ANTERIORES (memoria del agente) ===\n");
@@ -280,18 +335,25 @@ public class AiIncidentStudyService {
                 2. attack_vector_analysis: Análisis detallado del vector de ataque utilizado
                 3. vulnerability_exploited: Qué vulnerabilidad fue explotada o intentaron explotar
                 4. attack_sophistication: Nivel de sofisticación del ataque (1-10)
-                5. defense_recommendations: Lista de recomendaciones defensivas específicas
+                5. defense_recommendations: Lista de recomendaciones defensivas específicas y accionables
                 6. mitre_techniques: Lista de técnicas MITRE ATT&CK identificadas (ej: T1190, T1059)
                 7. new_patterns_discovered: Patrones nuevos que descubriste en este incidente
                 8. improvement_insights: Ideas para mejorar la detección y respuesta
                 9. lessons_learned: Lecciones aprendidas de este incidente
 
+                REGLAS CRÍTICAS:
+                - Analiza SOLO los datos técnicos del incidente proporcionado. No generes meta-análisis sobre el propio sistema de análisis.
+                - Si el incidente fue generado automáticamente por un playbook o respuesta automatizada, analiza el evento ORIGINAL que lo disparó, no la respuesta automática en sí.
+                - Si un incidente parece ser tráfico legítimo o actividad administrativa normal (actualizaciones, deploys, accesos SSH autorizados), indica claramente que la causa raíz es un falso positivo y recomienda agregar la IP/actividad a una whitelist.
+                - NUNCA generes textos auto-referenciales sobre "crisis del marco analítico", "destrucción del sistema", "colapso organizacional" o similar. Eso NO es análisis de seguridad.
+                - Cada estudio DEBE ser único y específico al incidente analizado. No copies conclusiones genéricas.
+                - Las recomendaciones defensivas deben ser ACCIONABLES (ej: "Agregar IP X.X.X.X a whitelist", "Crear regla de exclusión para puerto Y").
+
                 Si se proporcionan estudios anteriores similares, COMPÁRALOS con el incidente actual.
                 Identifica si hay patrones recurrentes, si las defensas anteriores funcionaron,
-                y si hay evolución en las tácticas del atacante. Esto es CRÍTICO para que el agente
-                aprenda y mejore como una red neuronal.
+                y si hay evolución en las tácticas del atacante.
 
-                Responde EXCLUSIVAMENTE en formato JSON:
+                Responde EXCLUSIVAMENTE en formato JSON válido:
                 ```json
                 {
                   "root_cause": "string",
@@ -392,6 +454,71 @@ public class AiIncidentStudyService {
         } catch (Exception e) {
             log.error("AI Evolution: Failed to add timeline entry: {}", e.getMessage());
         }
+    }
+
+    // ===== QUALITY VALIDATION =====
+
+    /**
+     * Detects degenerate/corrupted AI responses that indicate a feedback loop.
+     * Checks all text fields for known degenerate patterns.
+     */
+    private boolean isDegenerateResponse(AiIncidentStudy study) {
+        String combined = String.join(" ",
+                study.getRootCause() != null ? study.getRootCause() : "",
+                study.getDefenseRecommendations() != null ? study.getDefenseRecommendations() : "",
+                study.getLessonsLearned() != null ? study.getLessonsLearned() : "",
+                study.getImprovementInsights() != null ? study.getImprovementInsights() : "",
+                study.getAttackVectorAnalysis() != null ? study.getAttackVectorAnalysis() : ""
+        ).toUpperCase();
+
+        for (String pattern : DEGENERATE_PATTERNS) {
+            if (combined.contains(pattern.toUpperCase())) {
+                return true;
+            }
+        }
+
+        // Also flag if all recommendations are identical (single repeated string)
+        if (study.getDefenseRecommendations() != null) {
+            try {
+                var arr = objectMapper.readTree(study.getDefenseRecommendations());
+                if (arr.isArray() && arr.size() > 2) {
+                    Set<String> unique = new HashSet<>();
+                    for (var node : arr) unique.add(node.asText());
+                    if (unique.size() == 1) return true; // all identical recommendations
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return false;
+    }
+
+    /**
+     * Purge corrupted/degenerate studies from the database.
+     * Returns the count of purged studies.
+     */
+    public int purgeCorruptedStudies(String companyId) {
+        List<AiIncidentStudy> all = studyRepository.findByCompanyIdOrderByCreatedAtDesc(companyId);
+        int purged = 0;
+        for (AiIncidentStudy study : all) {
+            if (isDegenerateResponse(study)) {
+                study.setStatus(AiIncidentStudy.StudyStatus.FAILED);
+                study.setErrorMessage("Purged: degenerate feedback loop response detected");
+                studyRepository.save(study);
+                purged++;
+            }
+        }
+        // Reset circuit breaker after purge
+        companyFailureCount.put(companyId, 0);
+        log.info("AI Evolution: Purged {} corrupted studies for company {}", purged, companyId);
+        return purged;
+    }
+
+    /**
+     * Reset circuit breaker for a company (e.g., after fixing the issue).
+     */
+    public void resetCircuitBreaker(String companyId) {
+        companyFailureCount.put(companyId, 0);
+        log.info("AI Evolution: Circuit breaker reset for company {}", companyId);
     }
 
     // ===== CLAUDE API =====

@@ -318,43 +318,92 @@ services:
     networks:
       - blackwolf-net
 
-  linkedin-prospector:
+  # linkedin-prospector: DISABLED — non-cybersecurity agent removed from SOC
+  # Prospection and sales outreach belong to Dashboard-Ops, not SOC.
+  # To re-enable, uncomment below and run: docker compose up -d linkedin-prospector
+  #
+  # linkedin-prospector:
+  #   build:
+  #     context: ../linkedin-prospector
+  #   restart: always
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     LINKEDIN_EMAIL: ${LINKEDIN_EMAIL:-}
+  #     LINKEDIN_PASSWORD: ${LINKEDIN_PASSWORD:-}
+  #     BACKEND_URL: http://backend:8080/api/v1
+  #     PROSPECTOR_API_KEY: ${PROSPECTOR_API_KEY:-}
+  #   volumes:
+  #     - linkedin_cookies:/app/cookies
+  #   networks:
+  #     - blackwolf-net
+
+  # === TIER 2+3: ML & Scanner Microservices ===
+
+  ueba-ml:
     build:
-      context: ../linkedin-prospector
+      context: ./ueba-ml
+      dockerfile: Dockerfile
     restart: always
-    depends_on:
-      - backend
     environment:
-      LINKEDIN_EMAIL: ${LINKEDIN_EMAIL:-}
-      LINKEDIN_PASSWORD: ${LINKEDIN_PASSWORD:-}
-      BACKEND_URL: http://backend:8080/api/v1
-      PROSPECTOR_API_KEY: ${PROSPECTOR_API_KEY:-}
-      MAX_CONNECTIONS_PER_DAY: ${PROSPECTOR_MAX_CONNECTIONS:-20}
-      MAX_CONNECTIONS_WEEKEND: ${PROSPECTOR_MAX_CONNECTIONS_WEEKEND:-5}
-      MAX_MESSAGES_PER_DAY: ${PROSPECTOR_MAX_MESSAGES:-15}
-      MIN_DELAY_SECONDS: ${PROSPECTOR_MIN_DELAY:-180}
-      MAX_DELAY_SECONDS: ${PROSPECTOR_MAX_DELAY:-420}
-      WORK_HOUR_START: ${PROSPECTOR_WORK_START:-9}
-      WORK_HOUR_END: ${PROSPECTOR_WORK_END:-18}
-      GOOGLE_SEARCH_ENABLED: ${PROSPECTOR_GOOGLE_ENABLED:-true}
-      SMTP_VERIFY_ENABLED: ${PROSPECTOR_SMTP_VERIFY:-true}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      PUBLISH_ENABLED: ${PROSPECTOR_PUBLISH_ENABLED:-true}
-      PUBLISH_HOUR_1: ${PROSPECTOR_PUBLISH_HOUR_1:-10}
-      PUBLISH_HOUR_2: ${PROSPECTOR_PUBLISH_HOUR_2:-16}
-      LINKEDIN_COOKIES_PATH: /app/cookies/li_cookies.json
-      MAIL_HOST: ${MAIL_HOST:-}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
-      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
-      ALERT_FROM_EMAIL: ${ALERT_FROM_EMAIL:-}
-      EMAIL_OUTREACH_ENABLED: ${EMAIL_OUTREACH_ENABLED:-true}
-    volumes:
-      - linkedin_cookies:/app/cookies
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: admin
+      MYSQL_DATABASE: blackwolf
+      SOC_API_URL: http://backend:8080
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - blackwolf-net
+
+  asm-scanner:
+    build:
+      context: ./asm-scanner
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: admin
+      MYSQL_DATABASE: blackwolf
+      SOC_API_URL: http://backend:8080
+      SOC_API_KEY: ${SOC_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - blackwolf-net
+
+  zeek:
+    image: zeek/zeek:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - zeek_logs:/opt/zeek/logs
+      - /opt/zeek/etc:/opt/zeek/etc
+    command: ["/opt/zeek/bin/zeek", "-i", "${SURICATA_INTERFACE:-eth0}", "local"]
+    profiles:
+      - nta
+
+  zeek-bridge:
+    build:
+      context: ./zeek-bridge
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      SOC_API_URL: http://backend:8080
+      SOC_API_KEY: ${SOC_API_KEY:-}
+      SOC_COMPANY_ID: ${SOC_COMPANY_ID:-}
+      ZEEK_LOG_DIR: /opt/zeek/logs/current
+    volumes:
+      - zeek_logs:/opt/zeek/logs:ro
+    depends_on:
+      - backend
+    networks:
+      - blackwolf-net
+    profiles:
+      - nta
 
 networks:
   blackwolf-net:
@@ -369,3 +418,4 @@ volumes:
   suricata_logs:
   nginx_logs:
   linkedin_cookies:
+  zeek_logs:

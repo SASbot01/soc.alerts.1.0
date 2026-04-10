@@ -57,6 +57,9 @@ public class SensorService {
     private AssetRepository assetRepository;
 
     @Autowired
+    private TrustedIPRepository trustedIPRepository;
+
+    @Autowired
     private ActivityLogService activityLogService;
 
     @Autowired
@@ -114,10 +117,32 @@ public class SensorService {
             List<BlockedSubnet> activeSubnets = blockedSubnetRepository.findActiveByCompanyId(
                     upload.getCompany_id(), LocalDateTime.now());
 
+            // Load trusted IPs once for this upload batch
+            List<TrustedIP> trustedIPs = trustedIPRepository.findByCompanyIdOrderByCreatedAtDesc(
+                    upload.getCompany_id());
+
             // Dedup window: suppress duplicate alerts from same IP+type within 30 minutes
             LocalDateTime dedupSince = LocalDateTime.now().minusMinutes(30);
 
             for (ThreatInfo t : threats) {
+                // Trusted IP check: skip full processing if source IP is trusted (whitelist)
+                if (t.getSrc_ip() != null && isIpTrusted(t.getSrc_ip(), trustedIPs)) {
+                    ThreatEvent event = new ThreatEvent();
+                    event.setId(UUID.randomUUID().toString());
+                    event.setCompanyId(upload.getCompany_id());
+                    event.setSensorId(upload.getSensor_id());
+                    event.setThreatType(t.getThreat_type());
+                    event.setSeverity(t.getSeverity());
+                    event.setSrcIp(t.getSrc_ip());
+                    event.setDstIp(t.getDst_ip());
+                    event.setDstPort(t.getDst_port());
+                    event.setTimestamp(LocalDateTime.now());
+                    event.setStatus("trusted_ip");
+                    event.setDescription(t.getDescription());
+                    threatEventRepository.save(event);
+                    continue;  // Skip correlation, alerts, AI analysis, auto-block
+                }
+
                 // Subnet block check: skip processing if source IP is in a blocked subnet
                 if (t.getSrc_ip() != null && isIpInBlockedSubnet(t.getSrc_ip(), activeSubnets)) {
                     ThreatEvent event = new ThreatEvent();
@@ -217,7 +242,8 @@ public class SensorService {
                 }
 
                 // Auto Block logic (threshold raised to severity >= 7 to reduce false positives)
-                if (t.getSeverity() != null && t.getSeverity() >= 7) {
+                // Never auto-block trusted IPs
+                if (t.getSeverity() != null && t.getSeverity() >= 7 && !isIpTrusted(t.getSrc_ip(), trustedIPs)) {
                     BlockedIPId id = new BlockedIPId();
                     id.setIp(t.getSrc_ip());
                     id.setCompanyId(upload.getCompany_id());
@@ -266,6 +292,11 @@ public class SensorService {
     }
 
     // ===== Subnet Helpers =====
+
+    private boolean isIpTrusted(String ip, List<TrustedIP> trustedIPs) {
+        if (ip == null || trustedIPs.isEmpty()) return false;
+        return trustedIPs.stream().anyMatch(t -> ip.equals(t.getIp()));
+    }
 
     private boolean isIpInBlockedSubnet(String ip, List<BlockedSubnet> activeSubnets) {
         if (ip == null || !ip.contains(".") || activeSubnets.isEmpty()) return false;

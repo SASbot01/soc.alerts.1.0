@@ -2,7 +2,9 @@ package com.blackwolf.backend.controller;
 
 import com.blackwolf.backend.dto.SensorDTOs.*;
 import com.blackwolf.backend.model.Sensor;
+import com.blackwolf.backend.model.TrustedIP;
 import com.blackwolf.backend.repository.SensorRepository;
+import com.blackwolf.backend.repository.TrustedIPRepository;
 import com.blackwolf.backend.service.SensorService;
 import com.blackwolf.backend.util.AuthUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,9 @@ public class SensorController {
 
     @Autowired
     private SensorRepository sensorRepository;
+
+    @Autowired
+    private TrustedIPRepository trustedIPRepository;
 
     @Autowired
     private AuthUtils authUtils;
@@ -93,5 +98,49 @@ public class SensorController {
     @GetMapping("/{id}/assignments")
     public ResponseEntity<List<AssetSensorAssignmentResponse>> getSensorAssignments(Authentication auth, @PathVariable String id) {
         return ResponseEntity.ok(sensorService.getSensorAssignments(id, authUtils.getCompanyId(auth)));
+    }
+
+    // ===== Trusted IPs (Whitelist) =====
+
+    @GetMapping("/trusted-ips")
+    public ResponseEntity<List<TrustedIP>> listTrustedIPs(Authentication auth) {
+        String companyId = authUtils.getCompanyId(auth);
+        return ResponseEntity.ok(trustedIPRepository.findByCompanyIdOrderByCreatedAtDesc(companyId));
+    }
+
+    @PostMapping("/trusted-ips")
+    public ResponseEntity<TrustedIP> addTrustedIP(Authentication auth, @RequestBody Map<String, String> request) {
+        String companyId = authUtils.getCompanyId(auth);
+        String ip = request.get("ip");
+        String label = request.get("label");
+        String reason = request.get("reason");
+
+        if (ip == null || ip.isBlank() || label == null || label.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Check if already trusted
+        if (trustedIPRepository.existsByIpAndCompanyId(ip, companyId)) {
+            return ResponseEntity.ok(trustedIPRepository.findByIpAndCompanyId(ip, companyId).orElse(null));
+        }
+
+        TrustedIP trusted = new TrustedIP();
+        trusted.setCompanyId(companyId);
+        trusted.setIp(ip.trim());
+        trusted.setLabel(label);
+        trusted.setReason(reason);
+        trusted.setCreatedBy(authUtils.getUser(auth).getEmail());
+        trustedIPRepository.save(trusted);
+
+        return ResponseEntity.ok(trusted);
+    }
+
+    @DeleteMapping("/trusted-ips/{id}")
+    public ResponseEntity<Map<String, String>> removeTrustedIP(Authentication auth, @PathVariable String id) {
+        String companyId = authUtils.getCompanyId(auth);
+        trustedIPRepository.findById(id)
+                .filter(t -> t.getCompanyId().equals(companyId))
+                .ifPresent(trustedIPRepository::delete);
+        return ResponseEntity.ok(Map.of("status", "removed"));
     }
 }

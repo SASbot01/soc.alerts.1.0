@@ -49,6 +49,7 @@ public class AiAutonomousAgentService {
     @Autowired private CompanyRepository companyRepository;
     @Autowired private IncidentRepository incidentRepository;
     @Autowired(required = false) private com.blackwolf.backend.service.ai.CortexService cortexService;
+    @Autowired private TrustedIPRepository trustedIPRepository;
 
     @Value("${ai.claude.api-key:}")
     private String apiKey;
@@ -1031,6 +1032,12 @@ public class AiAutonomousAgentService {
 
     private void blockIp(String companyId, String ip, String reason, int hours) {
         try {
+            // Never block trusted IPs
+            if (trustedIPRepository.existsByIpAndCompanyId(ip, companyId)) {
+                log.info("AI Agent: Skipping block of trusted IP {} for company {}", ip, companyId);
+                return;
+            }
+
             BlockedIPId id = new BlockedIPId();
             id.setIp(ip);
             id.setCompanyId(companyId);

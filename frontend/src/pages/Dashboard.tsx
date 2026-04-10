@@ -1,19 +1,88 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { ShieldAlert, Radio, Activity, Globe, ArrowUpRight, Download, FileText } from 'lucide-react';
+import {
+    ShieldAlert, Radio, Activity, Globe, Server,
+    AlertCircle, Bell, Brain, Bug, HardDrive,
+    ClipboardCheck, ChevronRight, ArrowUpRight, Download, FileText,
+} from 'lucide-react';
 import { reportService } from '../lib/services';
-import RiskScoreGauge from '../components/RiskScoreGauge';
-import ThreatMap from '../components/ThreatMap';
-import AiAgentConsole from '../components/AiAgentConsole';
 import { useSseEvents } from '../hooks/useSseEvents';
 import { useAuth } from '../context/AuthContext';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+// ── Essential PYME security sections ──
+const SECTIONS = [
+    {
+        key: 'threats',
+        title: 'Amenazas',
+        description: 'Deteccion y respuesta en tiempo real',
+        icon: ShieldAlert,
+        color: '#EF4444',
+        path: '/threats',
+    },
+    {
+        key: 'incidents',
+        title: 'Incidentes',
+        description: 'Gestion del ciclo de vida de incidentes',
+        icon: AlertCircle,
+        color: '#F59E0B',
+        path: '/incidents',
+    },
+    {
+        key: 'assets',
+        title: 'Assets',
+        description: 'Inventario y control de activos',
+        icon: Server,
+        color: '#3B82F6',
+        path: '/assets',
+    },
+    {
+        key: 'infra',
+        title: 'Infraestructura',
+        description: 'Estado de sensores y servicios',
+        icon: HardDrive,
+        color: '#22C55E',
+        path: '/infrastructure',
+    },
+    {
+        key: 'vulns',
+        title: 'Vulnerabilidades',
+        description: 'CVEs y parcheado de sistemas',
+        icon: Bug,
+        color: '#A855F7',
+        path: '/vulnerabilities',
+    },
+    {
+        key: 'audits',
+        title: 'Auditorias',
+        description: 'Auditorias de seguridad y compliance',
+        icon: ClipboardCheck,
+        color: '#F5F5F5',
+        path: '/audits',
+    },
+    {
+        key: 'alerts',
+        title: 'Alertas',
+        description: 'Configuracion de notificaciones',
+        icon: Bell,
+        color: '#06B6D4',
+        path: '/alerts',
+    },
+    {
+        key: 'ai',
+        title: 'AI Agent',
+        description: 'Decisiones autonomas del agente IA',
+        icon: Brain,
+        color: '#EC4899',
+        path: '/ai-decisions',
+    },
+];
 
 const Dashboard: React.FC = () => {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [mapRefresh, setMapRefresh] = useState(0);
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     const fetchData = useCallback(async () => {
         try {
@@ -26,15 +95,11 @@ const Dashboard: React.FC = () => {
         }
     }, []);
 
-    // SSE: refresh dashboard + map on new threats/incidents
     useSseEvents({
         companyId: user?.companyId || null,
-        onThreat: useCallback(() => {
-            fetchData();
-            setMapRefresh(prev => prev + 1);
-        }, [fetchData]),
-        onIncident: useCallback(() => { fetchData(); }, [fetchData]),
-        onDashboardUpdate: useCallback(() => { fetchData(); }, [fetchData]),
+        onThreat: useCallback(() => fetchData(), [fetchData]),
+        onIncident: useCallback(() => fetchData(), [fetchData]),
+        onDashboardUpdate: useCallback(() => fetchData(), [fetchData]),
     });
 
     useEffect(() => {
@@ -43,116 +108,107 @@ const Dashboard: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchData]);
 
-    if (loading) return <div className="p-8 text-slate-400">Loading dashboard data...</div>;
-    if (!data) return <div className="p-8 text-red-400">Failed to load data.</div>;
+    const greeting = () => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Buenos dias';
+        if (h < 19) return 'Buenas tardes';
+        return 'Buenas noches';
+    };
 
-    const stats = [
-        { label: 'Total Threats', value: data.stats.total_threats, icon: ShieldAlert, color: 'text-red-400', bg: 'bg-red-400/10' },
-        { label: 'Active Sensors', value: data.stats.active_sensors, icon: Radio, color: 'text-green-400', bg: 'bg-green-400/10' },
-        { label: 'Threats Today', value: data.stats.threats_today, icon: Activity, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-        { label: 'Blocked IPs', value: data.stats.blocked_ips, icon: Globe, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    ];
-
-    // Transform distribution for chart
-    const chartData = Object.entries(data.attack_distribution || {}).map(([name, value]) => ({ name, value }));
+    const stats = data ? [
+        { label: 'Amenazas totales', value: data.stats?.total_threats || 0, icon: ShieldAlert, color: '#EF4444' },
+        { label: 'Sensores activos', value: data.stats?.active_sensors || 0, icon: Radio, color: '#22C55E' },
+        { label: 'Amenazas hoy', value: data.stats?.threats_today || 0, icon: Activity, color: '#F59E0B' },
+        { label: 'IPs bloqueadas', value: data.stats?.blocked_ips || 0, icon: Globe, color: '#3B82F6' },
+    ] : [];
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-start justify-between">
+        <div className="soc-home">
+            {/* ── Header ── */}
+            <div className="soc-home__header">
                 <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">Security Overview</h1>
-                    <p className="text-slate-400">Real-time threat monitoring for <span className="text-primary-400 font-medium">{data.company.name}</span></p>
+                    <h1 className="soc-home__greeting">
+                        {greeting()}, {user?.fullName?.split(' ')[0]}
+                    </h1>
+                    <p className="soc-home__subtitle">
+                        {data?.company?.name ? `${data.company.name} — ` : ''}Centro de Seguridad
+                    </p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => reportService.downloadExecutivePDF()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm transition-colors">
-                        <FileText className="w-4 h-4" /> PDF Report
+                <div className="soc-home__actions">
+                    <button onClick={() => reportService.downloadExecutivePDF()} className="soc-home__btn">
+                        <FileText style={{ width: 14, height: 14 }} /> PDF
                     </button>
-                    <button onClick={() => reportService.downloadThreatsCSV()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-[2px] text-sm transition-colors">
-                        <Download className="w-4 h-4" /> CSV
+                    <button onClick={() => reportService.downloadThreatsCSV()} className="soc-home__btn">
+                        <Download style={{ width: 14, height: 14 }} /> CSV
                     </button>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-[2px] backdrop-blur-sm hover:bg-slate-800/70 transition-colors">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-2 rounded-[2px] ${stat.bg} ${stat.color}`}>
-                                <stat.icon className="w-6 h-6" />
-                            </div>
-                            <span className="flex items-center text-xs font-medium text-slate-500 bg-slate-900/50 px-2 py-1 rounded-full">
-                                Live <div className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1 animate-pulse" />
-                            </span>
+            {/* ── Quick Stats ── */}
+            <div className="soc-stats-row">
+                {loading && !data
+                    ? [1, 2, 3, 4].map(i => (
+                        <div key={i} className="soc-stat" style={{ opacity: 0.3 }}>
+                            <div className="soc-stat__value">—</div>
+                            <div className="soc-stat__label">Cargando...</div>
                         </div>
-                        <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-                        <div className="text-sm text-slate-400">{stat.label}</div>
-                    </div>
-                ))}
+                    ))
+                    : stats.map((stat, i) => (
+                        <div key={i} className="soc-stat">
+                            <div className="soc-stat__icon" style={{ background: `${stat.color}12`, color: stat.color }}>
+                                <stat.icon style={{ width: 20, height: 20 }} />
+                            </div>
+                            <div className="soc-stat__value">{stat.value}</div>
+                            <div className="soc-stat__label">{stat.label}</div>
+                        </div>
+                    ))
+                }
             </div>
 
-            {/* Risk Score */}
-            <RiskScoreGauge />
-
-            {/* Threat Map */}
-            <ThreatMap refreshTrigger={mapRefresh} />
-
-            {/* AI Agent Console */}
-            <AiAgentConsole />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Chart */}
-                <div className="lg:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm">
-                    <h3 className="text-lg font-semibold text-white mb-6">Threat Distribution</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#ffffff" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#333333" />
-                                <XAxis dataKey="name" stroke="#999999" fontSize={11} tickLine={false} axisLine={false} angle={-35} textAnchor="end" height={60} interval={0} />
-                                <YAxis stroke="#999999" fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333333', color: '#ffffff' }}
-                                    itemStyle={{ color: '#E0E0E0' }}
-                                />
-                                <Area type="monotone" dataKey="value" stroke="#ffffff" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Recent Threats */}
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-6 backdrop-blur-sm overflow-hidden">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-semibold text-white">Recent Threats</h3>
-                        <button className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors">
-                            View All <ArrowUpRight className="w-3 h-3" />
+            {/* ── Recent Threats ── */}
+            {data?.recent_threats?.length > 0 && (
+                <div className="soc-recent-card">
+                    <div className="soc-recent-card__header">
+                        <span>Amenazas recientes</span>
+                        <button onClick={() => navigate('/threats')} className="soc-recent-card__link">
+                            Ver todas <ArrowUpRight style={{ width: 12, height: 12 }} />
                         </button>
                     </div>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700">
-                        {data.recent_threats.length === 0 ? (
-                            <div className="text-sm text-slate-500 text-center py-4">No recent threats detected</div>
-                        ) : (
-                            data.recent_threats.map((t: any) => (
-                                <div key={t.id} className="flex items-start gap-3 p-3 rounded-[2px] bg-slate-900/30 border border-slate-700/30 hover:bg-slate-900/50 transition-colors">
-                                    <div className={`mt-1 w-2 h-2 rounded-full ${t.severity >= 4 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-yellow-500'}`} />
-                                    <div>
-                                        <div className="text-sm font-medium text-white">{t.threatType}</div>
-                                        <div className="text-xs text-slate-500 font-mono mt-0.5">{t.srcIp} → {t.dstIp}</div>
-                                    </div>
-                                    <div className="ml-auto text-xs text-slate-600">
-                                        {new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
+                    <div className="soc-recent-card__list">
+                        {data.recent_threats.slice(0, 5).map((t: any) => (
+                            <div key={t.id} className="soc-recent-card__item">
+                                <div className={`soc-recent-card__dot ${t.severity >= 4 ? 'soc-recent-card__dot--critical' : 'soc-recent-card__dot--warning'}`} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="soc-recent-card__threat">{t.threatType}</div>
+                                    <div className="soc-recent-card__ip">{t.srcIp} → {t.dstIp}</div>
                                 </div>
-                            ))
-                        )}
+                                <div className="soc-recent-card__time">
+                                    {new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
+            )}
+
+            {/* ── Section Cards Grid ── */}
+            <div className="soc-cards-grid">
+                {SECTIONS.map(section => (
+                    <button
+                        key={section.key}
+                        className="soc-nav-card"
+                        onClick={() => navigate(section.path)}
+                    >
+                        <div className="soc-nav-card__icon" style={{ background: `${section.color}10`, color: section.color, border: `1px solid ${section.color}20` }}>
+                            <section.icon style={{ width: 22, height: 22 }} />
+                        </div>
+                        <div className="soc-nav-card__text">
+                            <div className="soc-nav-card__title">{section.title}</div>
+                            <div className="soc-nav-card__desc">{section.description}</div>
+                        </div>
+                        <ChevronRight style={{ width: 16, height: 16, color: 'rgba(255,255,255,0.15)' }} className="soc-nav-card__arrow" />
+                    </button>
+                ))}
             </div>
         </div>
     );

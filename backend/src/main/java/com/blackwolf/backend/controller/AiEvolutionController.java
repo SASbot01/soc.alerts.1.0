@@ -79,6 +79,34 @@ public class AiEvolutionController {
         return ResponseEntity.ok(evolutionService.getDashboardStats(companyId));
     }
 
+    // ===== Maintenance =====
+
+    /**
+     * Purge corrupted/degenerate AI studies caused by feedback loops.
+     * Marks them as FAILED so they are excluded from future analysis context.
+     */
+    @PostMapping("/studies/purge-corrupted")
+    public ResponseEntity<Map<String, Object>> purgeCorruptedStudies(Authentication auth) {
+        String companyId = authUtils.getCompanyId(auth);
+        int purged = studyService.purgeCorruptedStudies(companyId);
+        return ResponseEntity.ok(Map.of(
+                "purged", purged,
+                "message", purged > 0
+                        ? purged + " corrupted studies purged. Circuit breaker reset. New studies will start fresh."
+                        : "No corrupted studies found."
+        ));
+    }
+
+    /**
+     * Reset the circuit breaker if it was triggered.
+     */
+    @PostMapping("/studies/reset-circuit-breaker")
+    public ResponseEntity<Map<String, Object>> resetCircuitBreaker(Authentication auth) {
+        String companyId = authUtils.getCompanyId(auth);
+        studyService.resetCircuitBreaker(companyId);
+        return ResponseEntity.ok(Map.of("message", "Circuit breaker reset for company. Studies will resume."));
+    }
+
     // ===== PDF Report =====
 
     @GetMapping("/reports/pdf")

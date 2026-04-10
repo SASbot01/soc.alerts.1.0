@@ -97,8 +97,9 @@ public class AiEvolutionService {
         snapshot.setPeriodType(periodType);
         previousOpt.ifPresent(prev -> snapshot.setPreviousSnapshotId(prev.getId()));
 
-        // Calculate metrics from studies
-        List<AiIncidentStudy> periodStudies = studyRepository.findRecentCompleted(companyId, since);
+        // Calculate metrics from studies (filter out corrupted ones)
+        List<AiIncidentStudy> periodStudies = studyRepository.findRecentCompleted(companyId, since)
+                .stream().filter(s -> !isCorruptedStudy(s)).collect(Collectors.toList());
         snapshot.setTotalIncidentsStudied(periodStudies.size());
 
         // Count patterns discovered
@@ -200,10 +201,12 @@ public class AiEvolutionService {
         }
 
         prompt.append("\n=== LECCIONES APRENDIDAS (últimos estudios) ===\n");
-        for (AiIncidentStudy s : studies.stream().limit(10).collect(Collectors.toList())) {
-            if (s.getLessonsLearned() != null) {
-                prompt.append("- ").append(s.getLessonsLearned()).append("\n");
-            }
+        for (AiIncidentStudy s : studies.stream()
+                .filter(st -> st.getLessonsLearned() != null)
+                .filter(st -> !isCorruptedStudy(st))  // Filter out corrupted studies
+                .limit(10)
+                .collect(Collectors.toList())) {
+            prompt.append("- ").append(s.getLessonsLearned()).append("\n");
         }
 
         prompt.append("\nGenera un resumen de 3-5 párrafos sobre: evolución del agente, áreas de mejora, ");
@@ -211,7 +214,12 @@ public class AiEvolutionService {
         prompt.append("Responde en formato JSON: ");
         prompt.append("{\"evolution_summary\": \"...\", \"areas_of_improvement\": \"...\", \"areas_needing_attention\": \"...\"}");
 
-        String systemPrompt = "Eres un analista de ciberseguridad que evalúa la evolución y aprendizaje de un agente AI de seguridad. Responde en JSON.";
+        String systemPrompt = "Eres un analista de ciberseguridad que evalúa la evolución y aprendizaje de un agente AI de seguridad. " +
+                "Genera un análisis objetivo basado SOLO en las métricas y lecciones proporcionadas. " +
+                "NO generes textos auto-referenciales sobre 'crisis del marco analítico', 'destrucción del sistema', " +
+                "'colapso organizacional' o meta-análisis catastrofistas. Mantén un tono profesional y constructivo. " +
+                "Si las métricas son bajas, sugiere mejoras concretas en lugar de diagnosticar fallos existenciales. " +
+                "Responde en JSON.";
 
         try {
             Map<String, Object> apiResponse = callClaudeApi(systemPrompt, prompt.toString(), summaryMaxTokens);
@@ -362,6 +370,33 @@ public class AiEvolutionService {
 
     public List<AiEvolutionSnapshot> getSnapshots(String companyId) {
         return snapshotRepository.findByCompanyIdOrderBySnapshotDateDesc(companyId);
+    }
+
+    // ===== QUALITY VALIDATION =====
+
+    private static final List<String> DEGENERATE_PATTERNS = List.of(
+            "CONFIRMACIÓN MATEMÁTICA", "CRISIS ORGANIZACIONAL", "DESTRUCCIÓN DEL MARCO ANALÍTICO",
+            "CERTEZA MATEMÁTICA", "COLAPSO SISTÉMICO", "FALLO CATASTRÓFICO",
+            "DESTRUCCIÓN PERPETUA", "CRISIS PERPETUA"
+    );
+
+    /**
+     * Checks if a study response is corrupted/degenerate.
+     */
+    private boolean isCorruptedStudy(AiIncidentStudy study) {
+        String combined = String.join(" ",
+                study.getRootCause() != null ? study.getRootCause() : "",
+                study.getDefenseRecommendations() != null ? study.getDefenseRecommendations() : "",
+                study.getLessonsLearned() != null ? study.getLessonsLearned() : "",
+                study.getImprovementInsights() != null ? study.getImprovementInsights() : ""
+        ).toUpperCase();
+
+        for (String pattern : DEGENERATE_PATTERNS) {
+            if (combined.contains(pattern.toUpperCase())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ===== CLAUDE API =====

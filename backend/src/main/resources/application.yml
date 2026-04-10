@@ -148,10 +148,11 @@ spring.elasticsearch:
   connection-timeout: 5s
   socket-timeout: 30s
 
-# LinkedIn Prospector Bot
+# LinkedIn Prospector Bot — DISABLED (not cybersecurity)
 prospector:
   api-key: ${PROSPECTOR_API_KEY:}
-  bot-url: ${PROSPECTOR_BOT_URL:http://linkedin-prospector:8000}
+  bot-url: ${PROSPECTOR_BOT_URL:http://disabled:0}
+  enabled: false
 
 # LDAP (lldap)
 ldap:

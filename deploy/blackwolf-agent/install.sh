@@ -92,14 +92,24 @@ if ! command -v python3 &>/dev/null; then
 fi
 log_ok "Python3: $(python3 --version)"
 
-log_info "Installing requests module..."
-python3 -m pip install --quiet requests 2>/dev/null || pip3 install --quiet requests
-log_ok "requests module installed"
-
 # ── Create directories ──
 log_info "Creating directories..."
 mkdir -p "$AGENT_DIR" "$CONFIG_DIR"
 log_ok "Directories created"
+
+# ── Install python3-venv if needed ──
+if ! python3 -m venv --help &>/dev/null; then
+    log_info "Installing python3-venv..."
+    if command -v apt-get &>/dev/null; then
+        apt-get install -y -qq python3-venv
+    fi
+fi
+
+# ── Create venv and install dependencies (PEP 668 safe) ──
+log_info "Creating Python virtual environment..."
+python3 -m venv "$AGENT_DIR/venv"
+"$AGENT_DIR/venv/bin/pip" install --quiet requests
+log_ok "Virtual environment created with requests module"
 
 # ── Copy agent ──
 log_info "Installing agent..."
@@ -151,7 +161,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 ${AGENT_DIR}/blackwolf-agent.py
+ExecStart=${AGENT_DIR}/venv/bin/python3 ${AGENT_DIR}/blackwolf-agent.py
 Restart=always
 RestartSec=10
 Environment=AGENT_CONFIG=${CONFIG_DIR}/agent.conf

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Radio, SignalHigh, CircleOff, RefreshCw, Download, CheckCircle, Search, Link2, Trash2, Wifi, Monitor, Globe, ChevronDown, ChevronRight, Terminal, Eye } from 'lucide-react';
+import { Radio, SignalHigh, CircleOff, RefreshCw, Download, CheckCircle, Search, Link2, Trash2, Wifi, Monitor, Globe, ChevronDown, ChevronRight, Terminal, Eye, ShieldCheck, Plus } from 'lucide-react';
 import api from '../lib/api';
 import Modal from '../components/Modal';
 
@@ -56,6 +56,15 @@ interface Assignment {
     isActive: boolean;
 }
 
+interface TrustedIPEntry {
+    id: string;
+    ip: string;
+    label: string;
+    reason: string | null;
+    createdBy: string | null;
+    createdAt: string;
+}
+
 const categoryColors: Record<string, string> = {
     NETWORK: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
     ENDPOINT: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
@@ -71,7 +80,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const Sensors: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'my' | 'catalog'>('catalog');
+    const [activeTab, setActiveTab] = useState<'my' | 'catalog' | 'trusted'>('catalog');
     const [sensors, setSensors] = useState<Sensor[]>([]);
     const [catalog, setCatalog] = useState<SensorTemplate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -84,6 +93,36 @@ const Sensors: React.FC = () => {
     const [assignedAssetIds, setAssignedAssetIds] = useState<Set<string>>(new Set());
     const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
     const [assetSearch, setAssetSearch] = useState('');
+
+    // Trusted IPs
+    const [trustedIPs, setTrustedIPs] = useState<TrustedIPEntry[]>([]);
+    const [newTrustedIP, setNewTrustedIP] = useState({ ip: '', label: '', reason: '' });
+    const [addingTrusted, setAddingTrusted] = useState(false);
+
+    const loadTrustedIPs = async () => {
+        try {
+            const res = await api.get('/sensors/trusted-ips');
+            setTrustedIPs(res.data);
+        } catch { /* ignore */ }
+    };
+
+    const addTrustedIP = async () => {
+        if (!newTrustedIP.ip || !newTrustedIP.label) return;
+        setAddingTrusted(true);
+        try {
+            await api.post('/sensors/trusted-ips', newTrustedIP);
+            setNewTrustedIP({ ip: '', label: '', reason: '' });
+            await loadTrustedIPs();
+        } catch { /* ignore */ }
+        setAddingTrusted(false);
+    };
+
+    const removeTrustedIP = async (id: string) => {
+        try {
+            await api.delete(`/sensors/trusted-ips/${id}`);
+            await loadTrustedIPs();
+        } catch { /* ignore */ }
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -98,7 +137,7 @@ const Sensors: React.FC = () => {
         setLoading(false);
     };
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadData(); loadTrustedIPs(); }, []);
 
     const deploySensor = async (templateId: string) => {
         setDeploying(templateId);
@@ -190,6 +229,7 @@ const Sensors: React.FC = () => {
     const tabs = [
         { key: 'catalog' as const, label: 'Catalogo de Sensores', count: catalog.length },
         { key: 'my' as const, label: 'Mis Sensores', count: sensors.length },
+        { key: 'trusted' as const, label: 'IPs Confiables', count: trustedIPs.length },
     ];
 
     return (
@@ -218,7 +258,7 @@ const Sensors: React.FC = () => {
                                 BlackWolf SOC Agent <span className="text-[10px] px-2 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-[2px]">v1.0</span>
                             </h3>
                             <p className="text-slate-400 text-sm mt-0.5">
-                                Agente EDR ligero para Linux — FIM, monitoreo de procesos, deteccion de shells inversas, anomalias de red
+                                Agente EDR multiplataforma (Linux, Windows, macOS) — FIM, monitoreo de procesos, deteccion de shells inversas, anomalias de red
                             </p>
                             <div className="flex gap-3 mt-1">
                                 {['File Integrity', 'Auth Monitoring', 'Process Monitoring', 'Network C2 Detection', 'System Health'].map(cap => (
@@ -513,6 +553,99 @@ const Sensors: React.FC = () => {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Trusted IPs Tab */}
+            {activeTab === 'trusted' && (
+                <div className="space-y-6">
+                    <div className="bg-green-500/5 border border-green-500/20 rounded-[2px] p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <ShieldCheck className="w-5 h-5 text-green-400" />
+                            <h3 className="text-green-400 font-semibold">IPs Confiables (Whitelist)</h3>
+                        </div>
+                        <p className="text-slate-400 text-sm">
+                            Las IPs en esta lista nunca seran bloqueadas, no generaran incidentes ni activaran playbooks automaticos.
+                            Agrega aqui las IPs de tu equipo, servidores de deploy, VPNs corporativas, etc.
+                        </p>
+                    </div>
+
+                    {/* Add new trusted IP */}
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-[2px] p-4">
+                        <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                            <Plus className="w-4 h-4" /> Agregar IP Confiable
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <input
+                                value={newTrustedIP.ip}
+                                onChange={e => setNewTrustedIP({ ...newTrustedIP, ip: e.target.value })}
+                                placeholder="IP (ej: 203.0.113.50)"
+                                className="bg-slate-950 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm"
+                            />
+                            <input
+                                value={newTrustedIP.label}
+                                onChange={e => setNewTrustedIP({ ...newTrustedIP, label: e.target.value })}
+                                placeholder="Etiqueta (ej: Oficina Madrid)"
+                                className="bg-slate-950 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm"
+                            />
+                            <input
+                                value={newTrustedIP.reason}
+                                onChange={e => setNewTrustedIP({ ...newTrustedIP, reason: e.target.value })}
+                                placeholder="Razon (opcional)"
+                                className="bg-slate-950 border border-slate-700 rounded-[2px] px-3 py-2 text-white text-sm"
+                            />
+                            <button
+                                onClick={addTrustedIP}
+                                disabled={addingTrusted || !newTrustedIP.ip || !newTrustedIP.label}
+                                className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-[2px] px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+                            >
+                                {addingTrusted ? 'Agregando...' : 'Agregar'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Trusted IP list */}
+                    {trustedIPs.length === 0 ? (
+                        <div className="text-center py-16 text-slate-500">
+                            <ShieldCheck className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                            <p className="text-lg">No hay IPs confiables configuradas</p>
+                            <p className="text-sm mt-1">Agrega las IPs de tu equipo para evitar falsos positivos</p>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-[2px] overflow-hidden">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-slate-700/50">
+                                        <th className="text-left text-xs text-slate-400 font-medium p-3">IP</th>
+                                        <th className="text-left text-xs text-slate-400 font-medium p-3">Etiqueta</th>
+                                        <th className="text-left text-xs text-slate-400 font-medium p-3">Razon</th>
+                                        <th className="text-left text-xs text-slate-400 font-medium p-3">Agregado por</th>
+                                        <th className="text-left text-xs text-slate-400 font-medium p-3">Fecha</th>
+                                        <th className="text-right text-xs text-slate-400 font-medium p-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {trustedIPs.map(tip => (
+                                        <tr key={tip.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                                            <td className="p-3 font-mono text-sm text-green-400">{tip.ip}</td>
+                                            <td className="p-3 text-sm text-white">{tip.label}</td>
+                                            <td className="p-3 text-sm text-slate-400">{tip.reason || '-'}</td>
+                                            <td className="p-3 text-sm text-slate-500">{tip.createdBy || '-'}</td>
+                                            <td className="p-3 text-sm text-slate-500">{tip.createdAt ? new Date(tip.createdAt).toLocaleDateString() : '-'}</td>
+                                            <td className="p-3 text-right">
+                                                <button
+                                                    onClick={() => removeTrustedIP(tip.id)}
+                                                    className="text-red-400/60 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Assign Assets Modal */}
