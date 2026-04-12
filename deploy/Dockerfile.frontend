@@ -9,9 +9,10 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 # Replace stdout/stderr symlinks with real files for log monitoring
 RUN rm -f /var/log/nginx/access.log /var/log/nginx/error.log && \
     touch /var/log/nginx/access.log /var/log/nginx/error.log
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Inject MYTHONOS_AUTH_TOKEN into nginx config at runtime, then start nginx
+CMD ["/bin/sh", "-c", "sed \"s|MYTHONOS_TOKEN_PLACEHOLDER|${MYTHONOS_AUTH_TOKEN:-no-token}|g\" /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

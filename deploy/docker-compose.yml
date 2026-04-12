@@ -171,10 +171,38 @@ services:
     restart: always
     ports:
       - "80:80"
+    environment:
+      MYTHONOS_AUTH_TOKEN: ${MYTHONOS_AUTH_TOKEN:-change-me-mythonos-token}
     volumes:
       - nginx_logs:/var/log/nginx
     depends_on:
       - backend
+      - mythonos-engine
+    networks:
+      - blackwolf-net
+
+  # ── Mythonos: autonomous vulnerability research agent ──
+  # Uses Claude Opus 4.6 today; flip MYTHONOS_MODEL to mythos-preview
+  # when Anthropic publishes Mythos. No other code changes required.
+  mythonos-engine:
+    build:
+      context: ../mythonos-engine
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MYTHONOS_MODEL: ${MYTHONOS_MODEL:-claude-opus-4-6}
+      MYTHONOS_AUTH_TOKEN: ${MYTHONOS_AUTH_TOKEN:-change-me-mythonos-token}
+      MYTHONOS_MAX_ITERATIONS: ${MYTHONOS_MAX_ITERATIONS:-40}
+      MYTHONOS_PROMPT_CACHE: "true"
+      MYTHONOS_SANDBOX: inline
+      PORT: "3900"
+      HOST: "0.0.0.0"
+    volumes:
+      - mythonos_data:/app/data
+      - mythonos_targets:/app/targets
+    expose:
+      - "3900"
     networks:
       - blackwolf-net
 
@@ -419,3 +447,5 @@ volumes:
   nginx_logs:
   linkedin_cookies:
   zeek_logs:
+  mythonos_data:
+  mythonos_targets:
